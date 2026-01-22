@@ -4,6 +4,7 @@ export * from './entities/audit-log.entity';
 
 // Services
 export * from './services/audit-log.service';
+export * from './services/data-encryption.service';
 
 // Subscribers
 export * from './subscribers/audit.subscriber';
@@ -17,6 +18,15 @@ export * from './decorators/audit-context.decorator';
 
 // Utils
 export * from './utils/encryption.util';
+
+// Transformers
+export * from './transformers/encryption.transformer';
+
+// Middleware
+export * from './middleware/request-context.middleware';
+
+// Guards
+export * from './guards/audit-context.guard';
 
 // Module
 export * from './common.module';
