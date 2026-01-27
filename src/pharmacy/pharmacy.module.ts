@@ -7,12 +7,22 @@ import { PrescriptionItem } from './entities/prescription-item.entity';
 import { DrugInteraction } from './entities/drug-interaction.entity';
 import { ControlledSubstanceLog } from './entities/controlled-substance-log.entity';
 import { SafetyAlert } from './entities/safety-alert.entity';
+import { DrugSupplier } from './entities/drug-supplier.entity';
+import { PurchaseOrder } from './entities/purchase-order.entity';
+import { DrugRecall } from './entities/drug-recall.entity';
+import { DrugFormulary } from './entities/drug-formulary.entity';
+import { DrugWaste } from './entities/drug-waste.entity';
 import { DrugService } from './services/drug.service';
 import { PharmacyInventoryService } from './services/pharmacy-inventory.service';
 import { PrescriptionService } from './services/prescription.service';
 import { DrugInteractionService } from './services/drug-interaction.service';
 import { SafetyAlertService } from './services/safety-alert.service';
 import { ControlledSubstanceService } from './services/controlled-substance.service';
+import { DrugSupplierService } from './services/drug-supplier.service';
+import { PurchaseOrderService } from './services/purchase-order.service';
+import { DrugRecallService } from './services/drug-recall.service';
+import { DrugWasteService } from './services/drug-waste.service';
+import { InventoryAlertService } from './services/inventory-alert.service';
 import { PharmacyController } from './controllers/pharmacy.controller';
 
 @Module({
@@ -25,6 +35,11 @@ import { PharmacyController } from './controllers/pharmacy.controller';
       DrugInteraction,
       ControlledSubstanceLog,
       SafetyAlert,
+      DrugSupplier,
+      PurchaseOrder,
+      DrugRecall,
+      DrugFormulary,
+      DrugWaste,
     ]),
   ],
   controllers: [PharmacyController],
@@ -35,12 +50,22 @@ import { PharmacyController } from './controllers/pharmacy.controller';
     DrugInteractionService,
     SafetyAlertService,
     ControlledSubstanceService,
+    DrugSupplierService,
+    PurchaseOrderService,
+    DrugRecallService,
+    DrugWasteService,
+    InventoryAlertService,
   ],
   exports: [
     DrugService,
     PharmacyInventoryService,
     PrescriptionService,
     ControlledSubstanceService,
+    DrugSupplierService,
+    PurchaseOrderService,
+    DrugRecallService,
+    DrugWasteService,
+    InventoryAlertService,
   ],
 })
 export class PharmacyModule {}

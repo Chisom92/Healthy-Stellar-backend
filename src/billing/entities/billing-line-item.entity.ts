@@ -15,7 +15,7 @@ export class BillingLineItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   billingId: string;
 

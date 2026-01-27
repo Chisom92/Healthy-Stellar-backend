@@ -1,5 +1,5 @@
-import { IsString, IsEnum } from "class-validator";
-import { BedStatus } from "../../common/enums/bed-status.enum";
+import { IsString, IsEnum } from 'class-validator';
+import { BedStatus } from '../../../common/enums/bed-status.enum';
 
 export class AssignBedDto {
   @IsString()

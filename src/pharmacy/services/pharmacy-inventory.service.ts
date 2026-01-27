@@ -15,16 +15,16 @@ export class PharmacyInventoryService {
     return await this.inventoryRepository.find({
       where: { drugId },
       relations: ['drug'],
-      order: { expirationDate: 'ASC' }
+      order: { expirationDate: 'ASC' },
     });
   }
 
   async getTotalQuantity(drugId: string): Promise<number> {
     const inventories = await this.inventoryRepository.find({
-      where: { 
+      where: {
         drugId,
-        status: 'available'
-      }
+        status: 'available',
+      },
     });
 
     return inventories.reduce((total, inv) => total + inv.quantity, 0);
@@ -56,11 +56,11 @@ export class PharmacyInventoryService {
   async deductInventory(drugId: string, quantity: number): Promise<void> {
     // Use FIFO (First Expired First Out) - get earliest expiring available inventory
     const inventories = await this.inventoryRepository.find({
-      where: { 
+      where: {
         drugId,
-        status: 'available'
+        status: 'available',
       },
-      order: { expirationDate: 'ASC' }
+      order: { expirationDate: 'ASC' },
     });
 
     let remainingQuantity = quantity;
@@ -76,7 +76,9 @@ export class PharmacyInventoryService {
     }
 
     if (remainingQuantity > 0) {
-      throw new BadRequestException(`Insufficient inventory for drug ${drugId}. Short by ${remainingQuantity} units.`);
+      throw new BadRequestException(
+        `Insufficient inventory for drug ${drugId}. Short by ${remainingQuantity} units.`,
+      );
     }
   }
 
@@ -93,9 +95,9 @@ export class PharmacyInventoryService {
     return await this.inventoryRepository.find({
       where: {
         expirationDate: LessThan(new Date()),
-        status: 'available'
+        status: 'available',
       },
-      relations: ['drug']
+      relations: ['drug'],
     });
   }
 
@@ -111,5 +113,52 @@ export class PharmacyInventoryService {
       .andWhere('inventory.status = :status', { status: 'available' })
       .orderBy('inventory.expirationDate', 'ASC')
       .getMany();
+  }
+
+  async addInventoryFromPurchase(purchaseData: {
+    drugId: string;
+    quantity: number;
+    lotNumber: string;
+    expirationDate: Date;
+    unitCost: number;
+    supplierId?: string;
+    purchaseOrderNumber?: string;
+    location?: string;
+  }): Promise<PharmacyInventory> {
+    const inventory = this.inventoryRepository.create({
+      drugId: purchaseData.drugId,
+      quantity: purchaseData.quantity,
+      lotNumber: purchaseData.lotNumber,
+      expirationDate: purchaseData.expirationDate,
+      unitCost: purchaseData.unitCost,
+      sellingPrice: purchaseData.unitCost * 1.2, // Default markup of 20%
+      supplierId: purchaseData.supplierId,
+      purchaseOrderNumber: purchaseData.purchaseOrderNumber,
+      location: purchaseData.location || 'Main Pharmacy',
+      status: 'available',
+    });
+
+    return this.inventoryRepository.save(inventory);
+  }
+
+  async getRecalledItems(): Promise<PharmacyInventory[]> {
+    return this.inventoryRepository.find({
+      where: { isRecalled: true },
+      relations: ['drug'],
+    });
+  }
+
+  async markAsRecalled(inventoryId: string, recallReason: string): Promise<PharmacyInventory> {
+    const inventory = await this.inventoryRepository.findOne({ where: { id: inventoryId } });
+    if (!inventory) {
+      throw new NotFoundException(`Inventory item ${inventoryId} not found`);
+    }
+
+    inventory.isRecalled = true;
+    inventory.recallReason = recallReason;
+    inventory.recallDate = new Date();
+    inventory.status = 'recalled';
+
+    return this.inventoryRepository.save(inventory);
   }
 }

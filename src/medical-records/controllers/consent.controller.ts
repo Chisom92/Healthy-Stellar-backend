@@ -27,7 +27,7 @@ export class ConsentController {
   @ApiResponse({ status: 201, description: 'Consent created successfully' })
   async create(@Body() createDto: CreateConsentDto, @Req() req: any) {
     // Get patientId from the medical record
-    const record = await this.medicalRecordsService.findOne(createDto.medicalRecordId);
+    const record = await this.medicalRecordsService.findOne(createDto.recordId);
     const patientId = record.patientId;
     const grantedBy = req.user?.id || '00000000-0000-0000-0000-000000000000';
     return this.consentService.create(createDto, patientId, grantedBy);

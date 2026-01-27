@@ -1,13 +1,9 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Bed } from "./entities/bed.entity";
-import { BedStatus } from "../common/enums/bed-status.enum";
-import { AssignBedDto } from "./dto/assign-bed.dto";
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Bed } from './entities/bed.entity';
+import { BedStatus } from '../../common/enums/bed-status.enum';
+import { AssignBedDto } from './dto/assign-bed.dto';
 
 @Injectable()
 export class BedsService {
@@ -24,7 +20,7 @@ export class BedsService {
     }
 
     if (bed.status === BedStatus.OCCUPIED) {
-      throw new BadRequestException("Bed is already occupied");
+      throw new BadRequestException('Bed is already occupied');
     }
 
     bed.patientId = assignBedDto.patientId;
@@ -61,12 +57,12 @@ export class BedsService {
 
   async getAvailableBeds(roomId?: string): Promise<Bed[]> {
     const query = this.bedsRepository
-      .createQueryBuilder("bed")
-      .where("bed.status = :status", { status: BedStatus.AVAILABLE })
-      .andWhere("bed.isActive = :isActive", { isActive: true });
+      .createQueryBuilder('bed')
+      .where('bed.status = :status', { status: BedStatus.AVAILABLE })
+      .andWhere('bed.isActive = :isActive', { isActive: true });
 
     if (roomId) {
-      query.andWhere("bed.roomId = :roomId", { roomId });
+      query.andWhere('bed.roomId = :roomId', { roomId });
     }
 
     return query.getMany();
@@ -81,18 +77,17 @@ export class BedsService {
     reserved: number;
   }> {
     const beds = await this.bedsRepository
-      .createQueryBuilder("bed")
-      .innerJoin("bed.room", "room")
-      .where("room.wardId = :wardId", { wardId })
-      .andWhere("bed.isActive = :isActive", { isActive: true })
+      .createQueryBuilder('bed')
+      .innerJoin('bed.room', 'room')
+      .where('room.wardId = :wardId', { wardId })
+      .andWhere('bed.isActive = :isActive', { isActive: true })
       .getMany();
 
     return {
       total: beds.length,
       available: beds.filter((b) => b.status === BedStatus.AVAILABLE).length,
       occupied: beds.filter((b) => b.status === BedStatus.OCCUPIED).length,
-      maintenance: beds.filter((b) => b.status === BedStatus.MAINTENANCE)
-        .length,
+      maintenance: beds.filter((b) => b.status === BedStatus.MAINTENANCE).length,
       cleaning: beds.filter((b) => b.status === BedStatus.CLEANING).length,
       reserved: beds.filter((b) => b.status === BedStatus.RESERVED).length,
     };

@@ -22,7 +22,7 @@ export class ClaimDenial {
   @Index()
   denialNumber: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   claimId: string;
 
@@ -67,7 +67,7 @@ export class ClaimDenial {
   @Column({ type: 'boolean', default: false })
   isResolved: boolean;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   resolvedAt: Date;
 
   @Column({ type: 'varchar', length: 50, nullable: true })

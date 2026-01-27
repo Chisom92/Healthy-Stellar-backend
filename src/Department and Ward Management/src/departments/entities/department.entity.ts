@@ -5,14 +5,14 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
-import { Ward } from "../../wards/entities/ward.entity";
-import { Equipment } from "../../equipment/entities/equipment.entity";
-import { Workflow } from "../../workflows/entities/workflow.entity";
+} from 'typeorm';
+// import { Ward } from "../../wards/entities/ward.entity";
+// import { Equipment } from "../../equipment/entities/equipment.entity";
+// import { Workflow } from "../../workflows/entities/workflow.entity";
 
-@Entity("departments")
+@Entity('departments')
 export class Department {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
@@ -21,13 +21,13 @@ export class Department {
   @Column()
   code: string;
 
-  @Column("text", { array: true })
+  @Column('text', { array: true })
   specialties: string[];
 
   @Column({ nullable: true })
   headOfDepartment: string;
 
-  @Column("jsonb", { nullable: true })
+  @Column('jsonb', { nullable: true })
   resources: {
     staffCount: number;
     budgetAllocation: number;
@@ -37,14 +37,14 @@ export class Department {
   @Column({ default: true })
   isActive: boolean;
 
-  @OneToMany(() => Ward, (ward) => ward.department)
-  wards: Ward[];
+  // @OneToMany(() => Ward, (ward) => ward.department)
+  // wards: Ward[];
 
-  @OneToMany(() => Equipment, (equipment) => equipment.department)
-  equipment: Equipment[];
+  // @OneToMany(() => Equipment, (equipment) => equipment.department)
+  // equipment: Equipment[];
 
-  @OneToMany(() => Workflow, (workflow) => workflow.department)
-  workflows: Workflow[];
+  // @OneToMany(() => Workflow, (workflow) => workflow.department)
+  // workflows: Workflow[];
 
   @CreateDateColumn()
   createdAt: Date;

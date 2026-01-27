@@ -5,13 +5,13 @@ import {
   ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
-import { Department } from "../../departments/entities/department.entity";
-import { EquipmentStatus } from "../../common/enums/equipment-status.enum";
+} from 'typeorm';
+import { Department } from '../../../departments/entities/department.entity';
+import { EquipmentStatus } from '../../../common/enums/equipment-status.enum';
 
-@Entity("equipment")
+@Entity('equipment')
 export class Equipment {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
@@ -24,14 +24,14 @@ export class Equipment {
   serialNumber: string;
 
   @Column({
-    type: "enum",
+    type: 'enum',
     enum: EquipmentStatus,
     default: EquipmentStatus.AVAILABLE,
   })
   status: EquipmentStatus;
 
-  @ManyToOne(() => Department, (department) => department.equipment)
-  department: Department;
+  // @ManyToOne(() => Department, (department) => department.equipment)
+  // department: Department;
 
   @Column()
   departmentId: string;
@@ -42,10 +42,10 @@ export class Equipment {
   @Column({ nullable: true })
   assignedToRoomId: string;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   lastMaintenanceDate: Date;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   nextMaintenanceDate: Date;
 
   @CreateDateColumn()

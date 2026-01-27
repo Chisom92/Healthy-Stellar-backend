@@ -13,20 +13,23 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
     const sslEnabled = this.configService.get<string>('DB_SSL_ENABLED', 'true') === 'true';
 
     return {
-      type: 'mysql', // changed from 'postgres'
+      type: 'postgres', // changed from 'postgres'
       host: this.configService.get<string>('DB_HOST', 'localhost'),
       port: this.configService.get<number>('DB_PORT', 5432),
       username: this.configService.get<string>('DB_USERNAME'),
       password: this.configService.get<string>('DB_PASSWORD'),
       database: this.configService.get<string>('DB_NAME'),
-      
+
       // SSL/TLS Configuration for encrypted connections (HIPAA requirement)
-      ssl: sslEnabled ? {
-        rejectUnauthorized: isProduction,
-        ca: this.configService.get<string>('DB_SSL_CA'),
-        cert: this.configService.get<string>('DB_SSL_CERT'),
-        key: this.configService.get<string>('DB_SSL_KEY'),
-      } : false,
+      // ssl: sslEnabled
+      //   ? {
+      //       rejectUnauthorized: isProduction,
+      //       ca: this.configService.get<string>('DB_SSL_CA'),
+      //       cert: this.configService.get<string>('DB_SSL_CERT'),
+      //       key: this.configService.get<string>('DB_SSL_KEY'),
+      //     }
+      //   : false,
+      ssl: false,
 
       // Entity and Migration paths
       entities: [__dirname + '/../**/*.entity{.ts,.js}'],
@@ -35,14 +38,14 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
 
       // Security: Never use synchronize in production
       synchronize: false,
-      
+
       // Migrations should be run manually with proper audit trail
       migrationsRun: false,
-      
+
       // Logging configuration for audit trail
       logging: isProduction ? ['error', 'warn', 'migration'] : true,
       logger: 'advanced-console',
-      
+
       // Connection pool configuration for HIPAA compliance
       extra: {
         // Maximum connection pool size
@@ -64,10 +67,10 @@ export class DatabaseConfig implements TypeOrmOptionsFactory {
       // Connection retry strategy
       retryAttempts: 3,
       retryDelay: 3000,
-      
+
       // Transaction management
       maxQueryExecutionTime: 10000,
-      
+
       // Enable automatic query result caching (optional, can improve performance)
       cache: {
         type: 'database',
@@ -86,18 +89,21 @@ export const dataSourceOptions: DataSourceOptions = {
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  
-  ssl: process.env.DB_SSL_ENABLED === 'true' ? {
-    rejectUnauthorized: process.env.NODE_ENV === 'production',
-    ca: process.env.DB_SSL_CA,
-    cert: process.env.DB_SSL_CERT,
-    key: process.env.DB_SSL_KEY,
-  } : false,
+
+  ssl:
+    process.env.DB_SSL_ENABLED === 'true'
+      ? {
+          rejectUnauthorized: process.env.NODE_ENV === 'production',
+          ca: process.env.DB_SSL_CA,
+          cert: process.env.DB_SSL_CERT,
+          key: process.env.DB_SSL_KEY,
+        }
+      : false,
 
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../migrations/*{.ts,.js}'],
   subscribers: [AuditSubscriber],
-  
+
   synchronize: false,
   logging: process.env.NODE_ENV !== 'production',
 };

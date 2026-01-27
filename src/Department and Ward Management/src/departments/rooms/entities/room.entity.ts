@@ -6,21 +6,21 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
-import { Ward } from "../../wards/entities/ward.entity";
-import { Bed } from "../../beds/entities/bed.entity";
-import { RoomType } from "../../common/enums/room-type.enum";
+} from 'typeorm';
+import { Ward } from '../../wards/entities/ward.entity';
+import { Bed } from '../../beds/entities/bed.entity';
+import { RoomType } from '../../../common/enums/room-type.enum';
 
-@Entity("rooms")
+@Entity('rooms')
 export class Room {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
   roomNumber: string;
 
   @Column({
-    type: "enum",
+    type: 'enum',
     enum: RoomType,
     default: RoomType.GENERAL,
   })
@@ -29,17 +29,17 @@ export class Room {
   @Column()
   capacity: number;
 
-  @Column("text", { array: true, nullable: true })
+  @Column('text', { array: true, nullable: true })
   amenities: string[];
 
-  @ManyToOne(() => Ward, (ward) => ward.rooms)
-  ward: Ward;
+  // @ManyToOne(() => Ward, (ward) => ward.rooms)
+  // ward: Ward;
 
   @Column()
   wardId: string;
 
-  @OneToMany(() => Bed, (bed) => bed.room)
-  beds: Bed[];
+  // @OneToMany(() => Bed, (bed) => bed.room)
+  // beds: Bed[];
 
   @Column({ default: true })
   isActive: boolean;

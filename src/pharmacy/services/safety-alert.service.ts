@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { SafetyAlert } from '../entities/safety-alert.entity';
 import { Prescription } from '../entities/prescription.entity';
 import { Drug } from '../entities/drug.entity';
@@ -20,7 +20,7 @@ export class SafetyAlertService {
     const alerts: SafetyAlert[] = [];
 
     // Check drug interactions
-    const drugIds = prescription.items.map(item => item.drugId);
+    const drugIds = prescription.items.map((item) => item.drugId);
     const interactionCheck = await this.drugInteractionService.checkInteractions(drugIds);
 
     if (interactionCheck.hasInteractions) {
@@ -30,7 +30,7 @@ export class SafetyAlertService {
           alertType: 'drug-interaction',
           severity: interaction.severity as any,
           message: `Interaction detected between ${interaction.drug1.genericName} and ${interaction.drug2.genericName}`,
-          recommendation: interaction.management
+          recommendation: interaction.management,
         });
         alerts.push(alert);
       }
@@ -40,11 +40,12 @@ export class SafetyAlertService {
     if (prescription.patientAllergies && prescription.patientAllergies.length > 0) {
       for (const item of prescription.items) {
         const drug = await this.drugRepository.findOne({ where: { id: item.drugId } });
-        
+
         // Simple allergy check - in production, this would be more sophisticated
-        const allergyMatch = prescription.patientAllergies.some(allergy => 
-          drug.genericName.toLowerCase().includes(allergy.toLowerCase()) ||
-          drug.brandName.toLowerCase().includes(allergy.toLowerCase())
+        const allergyMatch = prescription.patientAllergies.some(
+          (allergy) =>
+            drug.genericName.toLowerCase().includes(allergy.toLowerCase()) ||
+            drug.brandName.toLowerCase().includes(allergy.toLowerCase()),
         );
 
         if (allergyMatch) {
@@ -53,7 +54,7 @@ export class SafetyAlertService {
             alertType: 'allergy',
             severity: 'critical',
             message: `Patient has documented allergy to ${drug.genericName}`,
-            recommendation: 'Do not dispense. Contact prescriber immediately.'
+            recommendation: 'Do not dispense. Contact prescriber immediately.',
           });
           alerts.push(alert);
         }
@@ -62,13 +63,13 @@ export class SafetyAlertService {
 
     // Check for duplicate therapy (same therapeutic class)
     const drugs = await this.drugRepository.find({
-      where: { id: In(drugIds) }
+      where: { id: In(drugIds) },
     });
 
     const therapeuticClassMap = new Map<string, Drug[]>();
-    drugs.forEach(drug => {
+    drugs.forEach((drug) => {
       if (drug.therapeuticClasses) {
-        drug.therapeuticClasses.forEach(tc => {
+        drug.therapeuticClasses.forEach((tc) => {
           if (!therapeuticClassMap.has(tc)) {
             therapeuticClassMap.set(tc, []);
           }
@@ -83,8 +84,8 @@ export class SafetyAlertService {
           prescriptionId: prescription.id,
           alertType: 'duplicate-therapy',
           severity: 'moderate',
-          message: `Multiple drugs from therapeutic class "${therapeuticClass}" prescribed: ${drugsInClass.map(d => d.genericName).join(', ')}`,
-          recommendation: 'Review for duplicate therapy. Verify with prescriber if intentional.'
+          message: `Multiple drugs from therapeutic class "${therapeuticClass}" prescribed: ${drugsInClass.map((d) => d.genericName).join(', ')}`,
+          recommendation: 'Review for duplicate therapy. Verify with prescriber if intentional.',
         });
         alerts.push(alert);
       }
@@ -101,13 +102,17 @@ export class SafetyAlertService {
   async getAlertsByPrescription(prescriptionId: string): Promise<SafetyAlert[]> {
     return await this.alertRepository.find({
       where: { prescriptionId },
-      order: { severity: 'DESC', createdAt: 'DESC' }
+      order: { severity: 'DESC', createdAt: 'DESC' },
     });
   }
 
-  async acknowledgeAlert(alertId: string, pharmacistId: string, notes?: string): Promise<SafetyAlert> {
+  async acknowledgeAlert(
+    alertId: string,
+    pharmacistId: string,
+    notes?: string,
+  ): Promise<SafetyAlert> {
     const alert = await this.alertRepository.findOne({ where: { id: alertId } });
-    
+
     alert.acknowledged = true;
     alert.acknowledgedBy = pharmacistId;
     alert.acknowledgedAt = new Date();

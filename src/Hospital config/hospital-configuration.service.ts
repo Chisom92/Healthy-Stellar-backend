@@ -1,4 +1,22 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DepartmentDto } from './src/hospital-configuration/dto/department.dto';
+import {
+  MedicalEquipmentDto,
+  ResourceDto,
+} from './src/hospital-configuration/dto/medical-equipment.dto';
+import {
+  HospitalPolicyDto,
+  MedicalProcedureDto,
+} from './src/hospital-configuration/dto/policy-procedure.dto';
+import {
+  MedicalAlertConfigDto,
+  NotificationSettingsDto,
+} from './src/hospital-configuration/dto/alert-notification.dto';
+import {
+  InsuranceProviderDto,
+  BillingConfigDto,
+} from './src/hospital-configuration/dto/insurance-billing.dto';
+import { EmergencyProtocolDto } from './src/hospital-configuration/dto/emergency-protocol.dto';
 
 @Injectable()
 export class HospitalConfigurationService {
@@ -8,8 +26,7 @@ export class HospitalConfigurationService {
   private policies: Map<string, HospitalPolicyDto> = new Map();
   private procedures: Map<string, MedicalProcedureDto> = new Map();
   private alertConfigs: Map<string, MedicalAlertConfigDto> = new Map();
-  private notificationSettings: Map<string, NotificationSettingsDto> =
-    new Map();
+  private notificationSettings: Map<string, NotificationSettingsDto> = new Map();
   private insuranceProviders: Map<string, InsuranceProviderDto> = new Map();
   private billingConfig: BillingConfigDto;
   private emergencyProtocols: Map<string, EmergencyProtocolDto> = new Map();
@@ -60,15 +77,10 @@ export class HospitalConfigurationService {
   }
 
   getEquipmentByDepartment(departmentId: string): MedicalEquipmentDto[] {
-    return Array.from(this.equipment.values()).filter(
-      (e) => e.departmentId === departmentId,
-    );
+    return Array.from(this.equipment.values()).filter((e) => e.departmentId === departmentId);
   }
 
-  updateEquipmentStatus(
-    id: string,
-    status: MedicalEquipmentDto["status"],
-  ): MedicalEquipmentDto {
+  updateEquipmentStatus(id: string, status: MedicalEquipmentDto['status']): MedicalEquipmentDto {
     const equip = this.getEquipment(id);
     equip.status = status;
     this.equipment.set(id, equip);
@@ -82,9 +94,7 @@ export class HospitalConfigurationService {
   }
 
   getResourceAvailability(departmentId: string): ResourceDto[] {
-    return Array.from(this.resources.values()).filter(
-      (r) => r.departmentId === departmentId,
-    );
+    return Array.from(this.resources.values()).filter((r) => r.departmentId === departmentId);
   }
 
   updateResourceCount(id: string, availableCount: number): ResourceDto {
@@ -108,11 +118,9 @@ export class HospitalConfigurationService {
     return policy;
   }
 
-  getPoliciesByCategory(
-    category: HospitalPolicyDto["category"],
-  ): HospitalPolicyDto[] {
+  getPoliciesByCategory(category: HospitalPolicyDto['category']): HospitalPolicyDto[] {
     return Array.from(this.policies.values()).filter(
-      (p) => p.category === category && p.status === "active",
+      (p) => p.category === category && p.status === 'active',
     );
   }
 
@@ -129,9 +137,7 @@ export class HospitalConfigurationService {
   }
 
   getProceduresByDepartment(departmentId: string): MedicalProcedureDto[] {
-    return Array.from(this.procedures.values()).filter(
-      (p) => p.departmentId === departmentId,
-    );
+    return Array.from(this.procedures.values()).filter((p) => p.departmentId === departmentId);
   }
 
   // Alert Configuration
@@ -151,9 +157,7 @@ export class HospitalConfigurationService {
   }
 
   // Notification Settings
-  setNotificationSettings(
-    settings: NotificationSettingsDto,
-  ): NotificationSettingsDto {
+  setNotificationSettings(settings: NotificationSettingsDto): NotificationSettingsDto {
     this.notificationSettings.set(settings.id, settings);
     return settings;
   }
@@ -162,10 +166,7 @@ export class HospitalConfigurationService {
     const settings = Array.from(this.notificationSettings.values()).find(
       (s) => s.departmentId === departmentId,
     );
-    if (!settings)
-      throw new NotFoundException(
-        `Settings for department ${departmentId} not found`,
-      );
+    if (!settings) throw new NotFoundException(`Settings for department ${departmentId} not found`);
     return settings;
   }
 
@@ -177,15 +178,12 @@ export class HospitalConfigurationService {
 
   getInsuranceProvider(id: string): InsuranceProviderDto {
     const provider = this.insuranceProviders.get(id);
-    if (!provider)
-      throw new NotFoundException(`Insurance provider ${id} not found`);
+    if (!provider) throw new NotFoundException(`Insurance provider ${id} not found`);
     return provider;
   }
 
   getAllActiveInsuranceProviders(): InsuranceProviderDto[] {
-    return Array.from(this.insuranceProviders.values()).filter(
-      (p) => p.isActive,
-    );
+    return Array.from(this.insuranceProviders.values()).filter((p) => p.isActive);
   }
 
   // Billing Configuration
@@ -195,34 +193,25 @@ export class HospitalConfigurationService {
   }
 
   getBillingConfig(): BillingConfigDto {
-    if (!this.billingConfig)
-      throw new NotFoundException("Billing config not found");
+    if (!this.billingConfig) throw new NotFoundException('Billing config not found');
     return this.billingConfig;
   }
 
   // Emergency Protocol Management
-  createEmergencyProtocol(
-    protocol: EmergencyProtocolDto,
-  ): EmergencyProtocolDto {
+  createEmergencyProtocol(protocol: EmergencyProtocolDto): EmergencyProtocolDto {
     this.emergencyProtocols.set(protocol.id, protocol);
     return protocol;
   }
 
   getEmergencyProtocol(id: string): EmergencyProtocolDto {
     const protocol = this.emergencyProtocols.get(id);
-    if (!protocol)
-      throw new NotFoundException(`Emergency protocol ${id} not found`);
+    if (!protocol) throw new NotFoundException(`Emergency protocol ${id} not found`);
     return protocol;
   }
 
   getEmergencyProtocolByCode(code: string): EmergencyProtocolDto {
-    const protocol = Array.from(this.emergencyProtocols.values()).find(
-      (p) => p.code === code,
-    );
-    if (!protocol)
-      throw new NotFoundException(
-        `Emergency protocol with code ${code} not found`,
-      );
+    const protocol = Array.from(this.emergencyProtocols.values()).find((p) => p.code === code);
+    if (!protocol) throw new NotFoundException(`Emergency protocol with code ${code} not found`);
     return protocol;
   }
 
@@ -234,160 +223,140 @@ export class HospitalConfigurationService {
   private initializeDefaultConfigurations(): void {
     // Sample Emergency Department
     this.createDepartment({
-      id: "dept-001",
-      name: "Emergency Department",
-      code: "ED",
-      description: "24/7 Emergency medical services",
-      headOfDepartment: "Dr. Sarah Johnson",
-      contactNumber: "+1-555-0100",
+      id: 'dept-001',
+      name: 'Emergency Department',
+      code: 'ED',
+      description: '24/7 Emergency medical services',
+      headOfDepartment: 'Dr. Sarah Johnson',
+      contactNumber: '+1-555-0100',
       location: {
-        building: "Main Hospital",
+        building: 'Main Hospital',
         floor: 1,
-        wing: "East Wing",
-        roomNumbers: ["E101-E120"],
+        wing: 'East Wing',
+        roomNumbers: ['E101-E120'],
       },
       operatingHours: {
-        monday: { open: "00:00", close: "23:59", isOpen: true },
-        tuesday: { open: "00:00", close: "23:59", isOpen: true },
-        wednesday: { open: "00:00", close: "23:59", isOpen: true },
-        thursday: { open: "00:00", close: "23:59", isOpen: true },
-        friday: { open: "00:00", close: "23:59", isOpen: true },
-        saturday: { open: "00:00", close: "23:59", isOpen: true },
-        sunday: { open: "00:00", close: "23:59", isOpen: true },
+        monday: { open: '00:00', close: '23:59', isOpen: true },
+        tuesday: { open: '00:00', close: '23:59', isOpen: true },
+        wednesday: { open: '00:00', close: '23:59', isOpen: true },
+        thursday: { open: '00:00', close: '23:59', isOpen: true },
+        friday: { open: '00:00', close: '23:59', isOpen: true },
+        saturday: { open: '00:00', close: '23:59', isOpen: true },
+        sunday: { open: '00:00', close: '23:59', isOpen: true },
         is24x7: true,
       },
       capacity: 50,
-      specializations: ["Trauma", "Critical Care", "Pediatric Emergency"],
+      specializations: ['Trauma', 'Critical Care', 'Pediatric Emergency'],
     });
 
     // Sample Emergency Protocol - Code Blue
     this.createEmergencyProtocol({
-      id: "protocol-001",
-      protocolName: "Cardiac Arrest Response",
-      code: "CODE-BLUE",
-      emergencyType: "code-blue",
-      severity: "critical",
-      description:
-        "Immediate response protocol for cardiac arrest or respiratory arrest",
-      activationCriteria: [
-        "Patient unresponsive",
-        "No pulse detected",
-        "Not breathing or gasping",
-      ],
+      id: 'protocol-001',
+      protocolName: 'Cardiac Arrest Response',
+      code: 'CODE-BLUE',
+      emergencyType: 'code-blue',
+      severity: 'critical',
+      description: 'Immediate response protocol for cardiac arrest or respiratory arrest',
+      activationCriteria: ['Patient unresponsive', 'No pulse detected', 'Not breathing or gasping'],
       responseTeam: [
         {
-          role: "Physician",
+          role: 'Physician',
           requiredCount: 1,
-          responsibilities: ["Lead resuscitation", "Make critical decisions"],
-          contactMethod: "Pager",
+          responsibilities: ['Lead resuscitation', 'Make critical decisions'],
+          contactMethod: 'Pager',
         },
         {
-          role: "Nurse",
+          role: 'Nurse',
           requiredCount: 2,
-          responsibilities: ["CPR", "Medication administration"],
-          contactMethod: "Overhead page",
+          responsibilities: ['CPR', 'Medication administration'],
+          contactMethod: 'Overhead page',
         },
         {
-          role: "Respiratory Therapist",
+          role: 'Respiratory Therapist',
           requiredCount: 1,
-          responsibilities: ["Airway management", "Ventilation"],
-          contactMethod: "Pager",
+          responsibilities: ['Airway management', 'Ventilation'],
+          contactMethod: 'Pager',
         },
         {
-          role: "Pharmacist",
+          role: 'Pharmacist',
           requiredCount: 1,
-          responsibilities: ["Prepare medications", "Dosage verification"],
-          contactMethod: "Phone",
+          responsibilities: ['Prepare medications', 'Dosage verification'],
+          contactMethod: 'Phone',
         },
       ],
       responseSteps: [
         {
           stepNumber: 1,
-          action: "Activate Code Blue alarm",
-          responsibleRole: "First responder",
-          timeFrame: "Immediate",
+          action: 'Activate Code Blue alarm',
+          responsibleRole: 'First responder',
+          timeFrame: 'Immediate',
           critical: true,
         },
         {
           stepNumber: 2,
-          action: "Begin CPR",
-          responsibleRole: "Nurse",
-          timeFrame: "Within 30 seconds",
+          action: 'Begin CPR',
+          responsibleRole: 'Nurse',
+          timeFrame: 'Within 30 seconds',
           critical: true,
         },
         {
           stepNumber: 3,
-          action: "Attach defibrillator/monitor",
-          responsibleRole: "Nurse",
-          timeFrame: "Within 1 minute",
+          action: 'Attach defibrillator/monitor',
+          responsibleRole: 'Nurse',
+          timeFrame: 'Within 1 minute',
           critical: true,
         },
         {
           stepNumber: 4,
-          action: "Establish IV access",
-          responsibleRole: "Nurse",
-          timeFrame: "Within 2 minutes",
+          action: 'Establish IV access',
+          responsibleRole: 'Nurse',
+          timeFrame: 'Within 2 minutes',
           critical: true,
         },
         {
           stepNumber: 5,
-          action: "Administer medications per ACLS protocol",
-          responsibleRole: "Physician",
-          timeFrame: "As needed",
+          action: 'Administer medications per ACLS protocol',
+          responsibleRole: 'Physician',
+          timeFrame: 'As needed',
           critical: true,
         },
       ],
-      requiredEquipment: [
-        "Crash cart",
-        "Defibrillator",
-        "Oxygen",
-        "Suction",
-        "Medications",
-      ],
+      requiredEquipment: ['Crash cart', 'Defibrillator', 'Oxygen', 'Suction', 'Medications'],
       communicationProtocol: {
-        internalChannels: ["Overhead paging", "Emergency hotline"],
-        externalAgencies: ["EMS if transfer needed"],
-        escalationChain: [
-          "Charge Nurse",
-          "Department Head",
-          "Chief Medical Officer",
-        ],
-        broadcastMethod: "Hospital-wide overhead page",
+        internalChannels: ['Overhead paging', 'Emergency hotline'],
+        externalAgencies: ['EMS if transfer needed'],
+        escalationChain: ['Charge Nurse', 'Department Head', 'Chief Medical Officer'],
+        broadcastMethod: 'Hospital-wide overhead page',
       },
       trainingRequired: true,
-      lastDrillDate: new Date("2025-12-15"),
-      nextDrillDate: new Date("2026-03-15"),
+      lastDrillDate: new Date('2025-12-15'),
+      nextDrillDate: new Date('2026-03-15'),
     });
 
     // Sample Insurance Provider
     this.addInsuranceProvider({
-      id: "ins-001",
-      name: "HealthCare Plus Insurance",
-      providerCode: "HCP",
-      contactPerson: "John Smith",
-      phoneNumber: "+1-555-0200",
-      email: "claims@healthcareplus.com",
-      address: "123 Insurance Ave, City, State 12345",
-      payerType: "private",
+      id: 'ins-001',
+      name: 'HealthCare Plus Insurance',
+      providerCode: 'HCP',
+      contactPerson: 'John Smith',
+      phoneNumber: '+1-555-0200',
+      email: 'claims@healthcareplus.com',
+      address: '123 Insurance Ave, City, State 12345',
+      payerType: 'private',
       acceptedPlans: [
         {
-          planId: "plan-001",
-          planName: "Gold Plan",
-          planType: "PPO",
+          planId: 'plan-001',
+          planName: 'Gold Plan',
+          planType: 'PPO',
           coveragePercentage: 80,
           deductible: 1000,
           copayAmount: 25,
           maxCoverage: 1000000,
-          coveredServices: [
-            "Emergency",
-            "Surgery",
-            "Diagnostics",
-            "Hospitalization",
-          ],
-          excludedServices: ["Cosmetic procedures", "Experimental treatments"],
+          coveredServices: ['Emergency', 'Surgery', 'Diagnostics', 'Hospitalization'],
+          excludedServices: ['Cosmetic procedures', 'Experimental treatments'],
         },
       ],
-      claimSubmissionMethod: "electronic",
+      claimSubmissionMethod: 'electronic',
       averageProcessingDays: 15,
       isActive: true,
     });

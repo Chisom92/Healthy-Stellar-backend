@@ -5,27 +5,27 @@ import {
   ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
-import { Room } from "../../rooms/entities/room.entity";
-import { BedStatus } from "../../common/enums/bed-status.enum";
+} from 'typeorm';
+import { Room } from '../../rooms/entities/room.entity';
+import { BedStatus } from '../../../common/enums/bed-status.enum';
 
-@Entity("beds")
+@Entity('beds')
 export class Bed {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
   bedNumber: string;
 
   @Column({
-    type: "enum",
+    type: 'enum',
     enum: BedStatus,
     default: BedStatus.AVAILABLE,
   })
   status: BedStatus;
 
-  @ManyToOne(() => Room, (room) => room.beds)
-  room: Room;
+  // @ManyToOne(() => Room, (room) => room.beds)
+  // room: Room;
 
   @Column()
   roomId: string;
@@ -33,10 +33,10 @@ export class Bed {
   @Column({ nullable: true })
   patientId: string;
 
-  @Column({ type: "timestamp", nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   assignedAt: Date;
 
-  @Column("text", { array: true, nullable: true })
+  @Column('text', { array: true, nullable: true })
   features: string[];
 
   @Column({ default: true })

@@ -20,7 +20,7 @@ export class ClaimAppeal {
   @Index()
   appealNumber: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   denialId: string;
 
@@ -28,7 +28,7 @@ export class ClaimAppeal {
   @JoinColumn({ name: 'denialId' })
   denial: ClaimDenial;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   claimId: string;
 

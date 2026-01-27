@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-import { Equipment } from "./entities/equipment.entity";
-import { AllocateEquipmentDto } from "./dto/allocate-equipment.dto";
-import { EquipmentStatus } from "../common/enums/equipment-status.enum";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Equipment } from './entities/equipment.entity';
+import { AllocateEquipmentDto } from './dto/allocate-equipment.dto';
+import { EquipmentStatus } from '../../common/enums/equipment-status.enum';
 
 @Injectable()
 export class EquipmentService {
@@ -28,9 +28,7 @@ export class EquipmentService {
     return this.equipmentRepository.save(equipment);
   }
 
-  async getAvailableEquipmentByDepartment(
-    departmentId: string,
-  ): Promise<Equipment[]> {
+  async getAvailableEquipmentByDepartment(departmentId: string): Promise<Equipment[]> {
     return this.equipmentRepository.find({
       where: {
         departmentId,
@@ -39,10 +37,7 @@ export class EquipmentService {
     });
   }
 
-  async scheduleMainten(
-    equipmentId: string,
-    maintenanceDate: Date,
-  ): Promise<Equipment> {
+  async scheduleMainten(equipmentId: string, maintenanceDate: Date): Promise<Equipment> {
     const equipment = await this.equipmentRepository.findOne({
       where: { id: equipmentId },
     });

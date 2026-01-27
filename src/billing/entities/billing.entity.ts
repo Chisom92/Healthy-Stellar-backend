@@ -19,7 +19,7 @@ export class Billing {
   @Index()
   invoiceNumber: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   patientId: string;
 

@@ -1,14 +1,4 @@
-typescript
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Param, 
-  Patch, 
-  Query,
-  UseGuards
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { DrugService } from '../services/drug.service';
 import { PrescriptionService } from '../services/prescription.service';
 import { PharmacyInventoryService } from '../services/pharmacy-inventory.service';
@@ -77,10 +67,7 @@ export class PharmacyController {
   }
 
   @Patch('inventory/:id')
-  async updateInventory(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateInventoryDto
-  ) {
+  async updateInventory(@Param('id') id: string, @Body() updateDto: UpdateInventoryDto) {
     return await this.inventoryService.updateInventory(id, updateDto);
   }
 
@@ -106,34 +93,22 @@ export class PharmacyController {
   }
 
   @Post('prescriptions/:id/verify')
-  async verifyPrescription(
-    @Param('id') id: string,
-    @Body('pharmacistId') pharmacistId: string
-  ) {
+  async verifyPrescription(@Param('id') id: string, @Body('pharmacistId') pharmacistId: string) {
     return await this.prescriptionService.verifyPrescription(id, pharmacistId);
   }
 
   @Post('prescriptions/:id/fill')
-  async fillPrescription(
-    @Param('id') id: string,
-    @Body('pharmacistId') pharmacistId: string
-  ) {
+  async fillPrescription(@Param('id') id: string, @Body('pharmacistId') pharmacistId: string) {
     return await this.prescriptionService.fillPrescription(id, pharmacistId);
   }
 
   @Post('prescriptions/:id/dispense')
-  async dispensePrescription(
-    @Param('id') id: string,
-    @Body('pharmacistId') pharmacistId: string
-  ) {
+  async dispensePrescription(@Param('id') id: string, @Body('pharmacistId') pharmacistId: string) {
     return await this.prescriptionService.dispensePrescription(id, pharmacistId);
   }
 
   @Post('prescriptions/:id/cancel')
-  async cancelPrescription(
-    @Param('id') id: string,
-    @Body('reason') reason: string
-  ) {
+  async cancelPrescription(@Param('id') id: string, @Body('reason') reason: string) {
     return await this.prescriptionService.cancelPrescription(id, reason);
   }
 
@@ -147,7 +122,7 @@ export class PharmacyController {
   async acknowledgeAlert(
     @Param('id') id: string,
     @Body('pharmacistId') pharmacistId: string,
-    @Body('notes') notes?: string
+    @Body('notes') notes?: string,
   ) {
     return await this.safetyAlertService.acknowledgeAlert(id, pharmacistId, notes);
   }
@@ -157,12 +132,12 @@ export class PharmacyController {
   async getControlledSubstanceLogs(
     @Param('drugId') drugId: string,
     @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string
+    @Query('endDate') endDate?: string,
   ) {
     return await this.controlledSubstanceService.getLogsByDrug(
       drugId,
       startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined
+      endDate ? new Date(endDate) : undefined,
     );
   }
 
@@ -170,20 +145,21 @@ export class PharmacyController {
   async getControlledSubstanceBalance(@Param('drugId') drugId: string) {
     return {
       drugId,
-      balance: await this.controlledSubstanceService.getRunningBalance(drugId)
+      balance: await this.controlledSubstanceService.getRunningBalance(drugId),
     };
   }
 
   @Post('controlled-substances/waste')
   async logControlledSubstanceWaste(
-    @Body() body: {
+    @Body()
+    body: {
       drugId: string;
       quantity: number;
       pharmacistLicense: string;
       pharmacistName: string;
       witnessName: string;
       reason: string;
-    }
+    },
   ) {
     return await this.controlledSubstanceService.logWaste(
       body.drugId,
@@ -191,18 +167,18 @@ export class PharmacyController {
       body.pharmacistLicense,
       body.pharmacistName,
       body.witnessName,
-      body.reason
+      body.reason,
     );
   }
 
   @Get('controlled-substances/report')
   async getControlledSubstanceReport(
     @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string
+    @Query('endDate') endDate: string,
   ) {
     return await this.controlledSubstanceService.generateReport(
       new Date(startDate),
-      new Date(endDate)
+      new Date(endDate),
     );
   }
 }

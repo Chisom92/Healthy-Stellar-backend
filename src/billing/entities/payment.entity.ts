@@ -20,7 +20,7 @@ export class Payment {
   @Index()
   paymentNumber: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   billingId: string;
 
@@ -28,10 +28,10 @@ export class Payment {
   @JoinColumn({ name: 'billingId' })
   billing: Billing;
 
-  @Column({ type: 'varchar', length: 100, nullable: true })
+  @Column({ type: 'uuid', nullable: true })
   claimId: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   patientId: string;
 

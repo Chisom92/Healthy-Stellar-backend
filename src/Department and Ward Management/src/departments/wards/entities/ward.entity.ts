@@ -6,13 +6,13 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
-import { Department } from "../../departments/entities/department.entity";
-import { Room } from "../../rooms/entities/room.entity";
+} from 'typeorm';
+import { Department } from '../../../departments/entities/department.entity';
+import { Room } from '../../rooms/entities/room.entity';
 
-@Entity("wards")
+@Entity('wards')
 export class Ward {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
@@ -30,14 +30,14 @@ export class Ward {
   @Column({ nullable: true })
   wardManagerId: string;
 
-  @ManyToOne(() => Department, (department) => department.wards)
-  department: Department;
+  // @ManyToOne(() => Department, (department) => department.wards)
+  // department: Department;
 
   @Column()
   departmentId: string;
 
-  @OneToMany(() => Room, (room) => room.ward)
-  rooms: Room[];
+  // @OneToMany(() => Room, (room) => room.ward)
+  // rooms: Room[];
 
   @Column({ default: true })
   isActive: boolean;

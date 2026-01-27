@@ -1,3 +1,5 @@
+import { LocationDto } from './department.dto';
+
 export class MedicalEquipmentDto {
   id: string;
   name: string;
@@ -7,7 +9,7 @@ export class MedicalEquipmentDto {
   serialNumber: string;
   departmentId: string;
   location: LocationDto;
-  status: "available" | "in-use" | "maintenance" | "out-of-service";
+  status: 'available' | 'in-use' | 'maintenance' | 'out-of-service';
   lastMaintenanceDate: Date;
   nextMaintenanceDate: Date;
   calibrationDate: Date;
@@ -17,7 +19,7 @@ export class MedicalEquipmentDto {
 
 export class ResourceDto {
   id: string;
-  resourceType: "bed" | "ventilator" | "monitor" | "wheelchair" | "other";
+  resourceType: 'bed' | 'ventilator' | 'monitor' | 'wheelchair' | 'other';
   totalCount: number;
   availableCount: number;
   departmentId: string;

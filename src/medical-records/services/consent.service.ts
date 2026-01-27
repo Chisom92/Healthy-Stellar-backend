@@ -1,12 +1,11 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
-import { MedicalRecordConsent, ConsentStatus, ConsentType } from '../entities/medical-record-consent.entity';
+import {
+  MedicalRecordConsent,
+  ConsentStatus,
+  ConsentType,
+} from '../entities/medical-record-consent.entity';
 import { MedicalHistory, HistoryEventType } from '../entities/medical-history.entity';
 import { CreateConsentDto } from '../dto/create-consent.dto';
 import { MedicalRecordsService } from './medical-records.service';
@@ -29,7 +28,7 @@ export class ConsentService {
     grantedBy: string,
   ): Promise<MedicalRecordConsent> {
     // Verify medical record exists
-    await this.medicalRecordsService.findOne(createDto.medicalRecordId, patientId);
+    await this.medicalRecordsService.findOne(createDto.recordId, patientId);
 
     const consent = this.consentRepository.create({
       ...createDto,
@@ -47,11 +46,11 @@ export class ConsentService {
       saved.medicalRecordId,
       patientId,
       HistoryEventType.CONSENT_GRANTED,
-      `Consent granted: ${createDto.consentType}`,
+      `Consent granted: ${createDto.consentTypes.join(', ')}`,
       grantedBy,
     );
 
-    this.logger.log(`Consent created: ${saved.id} for record ${createDto.medicalRecordId}`);
+    this.logger.log(`Consent created: ${saved.id} for record ${createDto.recordId}`);
     return saved;
   }
 
@@ -82,11 +81,7 @@ export class ConsentService {
     });
   }
 
-  async checkConsent(
-    recordId: string,
-    userId: string,
-    consentType: ConsentType,
-  ): Promise<boolean> {
+  async checkConsent(recordId: string, userId: string, consentType: ConsentType): Promise<boolean> {
     const now = new Date();
     const consent = await this.consentRepository.findOne({
       where: {
@@ -101,11 +96,7 @@ export class ConsentService {
     return !!consent;
   }
 
-  async revoke(
-    id: string,
-    revokedBy: string,
-    reason?: string,
-  ): Promise<MedicalRecordConsent> {
+  async revoke(id: string, revokedBy: string, reason?: string): Promise<MedicalRecordConsent> {
     const consent = await this.findOne(id);
 
     if (consent.status !== ConsentStatus.GRANTED) {

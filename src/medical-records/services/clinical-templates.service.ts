@@ -18,7 +18,14 @@ export class ClinicalTemplatesService {
     userId: string,
   ): Promise<ClinicalNoteTemplate> {
     const template = this.templateRepository.create({
-      ...createDto,
+      name: createDto.name,
+      description: createDto.description,
+      category: createDto.category as any, // Map enum if needed
+      structuredFields: createDto.fields,
+      metadata: {
+        ...createDto.metadata,
+        codingSystems: createDto.codingSystems,
+      },
       createdBy: userId,
     });
 

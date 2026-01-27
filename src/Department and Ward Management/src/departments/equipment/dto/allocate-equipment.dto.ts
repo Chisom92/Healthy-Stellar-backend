@@ -1,5 +1,5 @@
-import { IsString, IsEnum, IsOptional } from "class-validator";
-import { EquipmentStatus } from "../../common/enums/equipment-status.enum";
+import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { EquipmentStatus } from '../../../common/enums/equipment-status.enum';
 
 export class AllocateEquipmentDto {
   @IsString()

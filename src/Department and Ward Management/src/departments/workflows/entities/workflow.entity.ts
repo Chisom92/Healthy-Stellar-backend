@@ -5,21 +5,21 @@ import {
   ManyToOne,
   CreateDateColumn,
   UpdateDateColumn,
-} from "typeorm";
-import { Department } from "../../departments/entities/department.entity";
+} from 'typeorm';
+// import { Department } from '../../departments/entities/department.entity';
 
-@Entity("workflows")
+@Entity('workflows')
 export class Workflow {
-  @PrimaryGeneratedColumn("uuid")
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column()
   name: string;
 
-  @Column("text")
+  @Column('text')
   description: string;
 
-  @Column("jsonb")
+  @Column('jsonb')
   steps: {
     order: number;
     title: string;
@@ -28,8 +28,8 @@ export class Workflow {
     estimatedDuration: number;
   }[];
 
-  @ManyToOne(() => Department, (department) => department.workflows)
-  department: Department;
+  // @ManyToOne(() => Department, (department) => department.workflows)
+  // department: Department;
 
   @Column()
   departmentId: string;

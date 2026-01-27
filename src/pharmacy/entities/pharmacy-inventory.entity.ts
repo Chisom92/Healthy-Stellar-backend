@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, UpdateDateColumn, JoinColumn, OneToMany } from 'typeorm';
 import { Drug } from './drug.entity';
 
 @Entity('pharmacy_inventory')
@@ -10,7 +10,7 @@ export class PharmacyInventory {
   @JoinColumn({ name: 'drug_id' })
   drug: Drug;
 
-  @Column()
+  @Column({ type: 'uuid' })
   drugId: string;
 
   @Column()
@@ -28,6 +28,18 @@ export class PharmacyInventory {
   @Column({ type: 'date' })
   expirationDate: Date;
 
+  @Column({ type: 'date', nullable: true })
+  manufacturedDate: Date;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  manufacturer: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  supplierId: string; // Reference to vendor/supplier
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  purchaseOrderNumber: string;
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   unitCost: number;
 
@@ -38,7 +50,25 @@ export class PharmacyInventory {
   location: string; // shelf/bin location
 
   @Column({ default: 'available' })
-  status: string; // available, low-stock, expired, recalled
+  status: string; // available, low-stock, expired, recalled, quarantined
+
+  @Column({ type: 'boolean', default: false })
+  isRecalled: boolean;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  recallReason: string;
+
+  @Column({ type: 'date', nullable: true })
+  recallDate: Date;
+
+  @Column({ type: 'boolean', default: false })
+  isFormularyDrug: boolean;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  formularyTier: string; // preferred, non-preferred, etc.
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  formularyCopay: number;
 
   @CreateDateColumn()
   createdAt: Date;

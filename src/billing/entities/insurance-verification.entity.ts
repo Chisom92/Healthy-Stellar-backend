@@ -16,7 +16,7 @@ export class InsuranceVerification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   insuranceId: string;
 
@@ -108,10 +108,10 @@ export class InsuranceVerification {
   @Column({ type: 'text', nullable: true })
   errorMessage: string;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamp' })
   verifiedAt: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   expiresAt: Date;
 
   @CreateDateColumn()

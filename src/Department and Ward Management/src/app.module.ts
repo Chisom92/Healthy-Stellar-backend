@@ -1,30 +1,22 @@
-import { Module } from "@nestjs/common";
-import { TypeOrmModule } from "@nestjs/typeorm";
-import { DepartmentsModule } from "./departments/departments.module";
-import { WardsModule } from "./wards/wards.module";
-import { RoomsModule } from "./rooms/rooms.module";
-import { BedsModule } from "./beds/beds.module";
-import { EquipmentModule } from "./equipment/equipment.module";
-import { WorkflowsModule } from "./workflows/workflows.module";
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { DepartmentsModule } from './departments/departments.module';
+import { BedsModule } from './departments/beds/beds.module';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
-      type: "postgres",
-      host: "localhost",
-      port: 5432,
-      username: "postgres",
-      password: "password",
-      database: "hospital_management",
-      entities: [__dirname + "/**/*.entity{.ts,.js}"],
-      synchronize: true, // Set to false in production
+      type: 'postgres',
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT),
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      autoLoadEntities: true,
+      synchronize: false, // true only in dev
     }),
     DepartmentsModule,
-    WardsModule,
-    RoomsModule,
     BedsModule,
-    EquipmentModule,
-    WorkflowsModule,
   ],
 })
 export class AppModule {}

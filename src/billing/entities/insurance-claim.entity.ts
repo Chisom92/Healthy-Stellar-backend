@@ -22,11 +22,11 @@ export class InsuranceClaim {
   @Index()
   claimNumber: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   billingId: string;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   insuranceId: string;
 
@@ -34,7 +34,7 @@ export class InsuranceClaim {
   @JoinColumn({ name: 'insuranceId' })
   insurance: Insurance;
 
-  @Column({ type: 'varchar', length: 100 })
+  @Column({ type: 'uuid' })
   @Index()
   patientId: string;
 
@@ -65,13 +65,13 @@ export class InsuranceClaim {
   @Column({ type: 'date' })
   serviceEndDate: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   submittedAt: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   acceptedAt: Date;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   adjudicatedAt: Date;
 
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })

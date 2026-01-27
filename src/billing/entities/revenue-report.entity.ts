@@ -27,7 +27,7 @@ export class RevenueReport {
   @Column({ type: 'date' })
   periodEnd: Date;
 
-  @Column({ type: 'datetime' })
+  @Column({ type: 'timestamp' })
   generatedAt: Date;
 
   @Column({ type: 'decimal', precision: 14, scale: 2, default: 0 })

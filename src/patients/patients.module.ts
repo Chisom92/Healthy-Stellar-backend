@@ -3,21 +3,16 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PatientsController } from './patients.controller';
 import { PatientsService } from './patients.service';
 import { Patient } from './entities/patient.entity';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { PatientPrivacyGuard } from './guards/patient-privacy.guard';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Patient]), // register Patient entity
+    AuthModule,
   ],
   controllers: [PatientsController],
-  providers: [
-    PatientsService,
-    JwtAuthGuard,
-    RolesGuard,
-    PatientPrivacyGuard,
-  ],
+  providers: [PatientsService, PatientPrivacyGuard],
   exports: [PatientsService], // so other modules can inject the service
 })
 export class PatientModule {}

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { MedicalRecordsModule } from './medical-records/medical-records.module';
@@ -14,6 +15,10 @@ import { DatabaseConfig } from './config/database.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HealthController } from './health.controller';
+import { ValidationModule } from './common/validation/validation.module';
+import { MedicalEmergencyErrorFilter } from './common/errors/medical-emergency-error.filter';
+import { MedicalDataValidationPipe } from './common/validation/medical-data.validator.pipe';
+import { AuditLogEntity } from './common/audit/audit-log.entity';
 
 @Module({
   imports: [
@@ -41,8 +46,19 @@ import { HealthController } from './health.controller';
     LaboratoryModule,
     DiagnosisModule,
     TreatmentPlanningModule,
+    ValidationModule
   ],
   controllers: [AppController, HealthController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_FILTER,
+      useClass: MedicalEmergencyErrorFilter
+    },
+    {
+      provide: APP_PIPE,
+      useClass: MedicalDataValidationPipe
+    }
+  ],
 })
 export class AppModule {}
