@@ -17,7 +17,7 @@ import { EmergencyOperationsModule } from './emergency-operations/emergency-oper
 import { DatabaseConfig } from './config/database.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { HealthController } from './health.controller';
+import { HealthModule } from './health/health.module';
 import { ValidationModule } from './common/validation/validation.module';
 import { MedicalEmergencyErrorFilter } from './common/errors/medical-emergency-error.filter';
 import { MedicalDataValidationPipe } from './common/validation/medical-data.validator.pipe';
@@ -53,8 +53,9 @@ import { AuditLogEntity } from './common/audit/audit-log.entity';
     EmergencyOperationsModule,
     ValidationModule,
     InfectionControlModule,
+    HealthModule,
   ],
-  controllers: [AppController, HealthController],
+  controllers: [AppController],
   providers: [
     AppService,
     {
