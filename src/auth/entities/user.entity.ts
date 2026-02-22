@@ -65,6 +65,8 @@ export class User {
   @Column({ type: 'text', nullable: true })
   specialization: string;
 
+  @Column({ default: true })
+  emergencyAccessEnabled: boolean;
   @Column({ type: 'simple-array', nullable: true })
   permissions: string[];
 
