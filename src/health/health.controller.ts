@@ -1,4 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HealthCheckResult } from '@nestjs/terminus';
+import { PostgresHealthIndicator } from './indicators/postgres.indicator';
+import { RedisHealthIndicator } from './indicators/redis.indicator';
+import { IpfsHealthIndicator } from './indicators/ipfs.indicator';
+import { StellarHealthIndicator } from './indicators/stellar.indicator';
+
+@Controller('health')
+export class HealthController {
+  constructor(
+    private health: HealthCheckService,
+    private postgres: PostgresHealthIndicator,
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { RedisHealthIndicator } from './indicators/redis.health';
@@ -20,6 +31,8 @@ export class HealthController {
 
   @Get()
   @HealthCheck()
+  check(): Promise<HealthCheckResult> {
+    return this.health.check([]);
   @ApiOperation({ summary: 'Overall system health (liveness probe)' })
   @ApiResponse({ status: 200, description: 'System is alive' })
   check() {
@@ -30,6 +43,9 @@ export class HealthController {
 
   @Get('ready')
   @HealthCheck()
+  readiness(): Promise<HealthCheckResult> {
+    return this.health.check([
+      () => this.postgres.isHealthy('postgres'),
   @ApiOperation({ summary: 'Readiness probe (all dependencies healthy)' })
   @ApiResponse({ status: 200, description: 'System is ready' })
   @ApiResponse({ status: 503, description: 'System is not ready' })
