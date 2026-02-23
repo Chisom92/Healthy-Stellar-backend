@@ -3,6 +3,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
@@ -93,6 +94,7 @@ const getUserTrackerFromRequest = (req: any): string => {
 };
 import { TenantInterceptor } from './tenant/interceptors/tenant.interceptor';
 import { AuditLogEntity } from './common/audit/audit-log.entity';
+import { JobsModule } from './jobs/jobs.module';
 import { AuditModule } from './common/audit/audit.module';
 
 @Module({
@@ -105,6 +107,7 @@ import { AuditModule } from './common/audit/audit.module';
     TypeOrmModule.forRootAsync({
       useClass: DatabaseConfig,
     }),
+    ScheduleModule.forRoot(),
     // Rate limiting and throttling for security
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -156,6 +159,7 @@ import { AuditModule } from './common/audit/audit.module';
     QueueModule,
     FhirModule,
     AccessControlModule,
+    JobsModule,
     StellarModule,
     AuditModule,
     ReportsModule,
