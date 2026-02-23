@@ -29,6 +29,7 @@ import { MedicalDataValidationPipe } from './common/validation/medical-data.vali
 import { NotificationsModule } from './notifications/notifications.module';
 import { QueueModule } from './queues/queue.module';
 import { TenantConfigModule } from './tenant-config/tenant-config.module';
+import { GdprModule } from './gdpr/gdpr.module';
 
 const hasBearerAuthUser = (req: any): boolean => {
   const authHeader = req?.headers?.authorization;
@@ -135,6 +136,7 @@ import { AuditModule } from './common/audit/audit.module';
     AuditModule,
     ReportsModule,
     TenantConfigModule,
+    GdprModule,
   ],
   controllers: [AppController],
   providers: [
