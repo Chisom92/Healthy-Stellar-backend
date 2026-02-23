@@ -7,6 +7,7 @@ import { JwtPayload } from '../services/auth-token.service';
 import { MfaSetupDto, MfaVerifyDto, MfaEnableDto, BackupCodesDto } from '../dto/mfa.dto';
 import { AuditService } from '../../common/audit/audit.service';
 import { AuditAction } from '../../common/audit/audit-log.entity';
+import { VerifyRateLimit, AuthRateLimit } from '../../common/throttler/throttler.decorator';
 
 @ApiTags('Multi-Factor Authentication')
 @Controller('auth/mfa')
@@ -21,6 +22,7 @@ export class MfaController {
    */
   @Post('setup')
   @UseGuards(JwtAuthGuard)
+  @AuthRateLimit() // 10 requests per minute
   @ApiOperation({ summary: 'Initialize MFA setup - returns secret and QR code' })
   @ApiResponse({ status: 200, description: 'MFA setup initialized' })
   async setupMfa(@Body() mfaSetupDto: MfaSetupDto, @Req() req: Request): Promise<any> {
@@ -56,6 +58,7 @@ export class MfaController {
    */
   @Post('verify')
   @UseGuards(JwtAuthGuard)
+  @VerifyRateLimit() // 5 requests per minute
   @ApiOperation({ summary: 'Verify MFA code and enable MFA' })
   @ApiResponse({ status: 200, description: 'MFA enabled successfully' })
   async verifyMfa(@Body() mfaEnableDto: MfaEnableDto, @Req() req: Request): Promise<any> {
@@ -94,6 +97,7 @@ export class MfaController {
    */
   @Post('verify-code')
   @UseGuards(JwtAuthGuard)
+  @VerifyRateLimit() // 5 requests per minute
   @ApiOperation({ summary: 'Verify MFA code' })
   @ApiResponse({ status: 200, description: 'MFA code verified' })
   async verifyCode(@Body() mfaVerifyDto: MfaVerifyDto, @Req() req: Request): Promise<any> {
