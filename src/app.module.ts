@@ -1,14 +1,12 @@
-import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
 import { MedicalRecordsModule } from './medical-records/medical-records.module';
+import { RecordsModule } from './records/records.module';
 import { CommonModule } from './common/common.module';
 import { PatientModule } from './patients/patients.module';
 import { LaboratoryModule } from './laboratory/laboratory.module';
@@ -17,6 +15,12 @@ import { TreatmentPlanningModule } from './treatment-planning/treatment-planning
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { InfectionControlModule } from './infection-control/infection-control.module';
 import { TenantModule } from './tenant/tenant.module';
+import { EmergencyOperationsModule } from './emergency-operations/emergency-operations.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { QueueModule } from './queues/queue.module';
+import { FhirModule } from './fhir/fhir.module';
+import { AccessControlModule } from './access-control/access-control.module';
+import { StellarModule } from './stellar/stellar.module';
 import { DatabaseConfig } from './config/database.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -75,6 +79,7 @@ import { AuditLogEntity } from './common/audit/audit-log.entity';
     AuthModule,
     BillingModule,
     MedicalRecordsModule,
+    RecordsModule,
     PatientModule,
     LaboratoryModule,
     DiagnosisModule,
