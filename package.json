@@ -23,7 +23,7 @@
     "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/config/database.config.ts",
     "migration:run": "typeorm-ts-node-commonjs migration:run -d src/config/database.config.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/config/database.config.ts",
-    "seed": "ts-node -r tsconfig-paths/register src/database/seeder.ts"
+    "seed": "ts-node -r tsconfig-paths/register src/database/seeder.ts",
     "benchmark:db": "ts-node scripts/benchmark-database-performance.ts",
     "explain:queries": "ts-node scripts/explain-query-plans.ts"
   },
@@ -87,9 +87,11 @@
   "devDependencies": {
     "@faker-js/faker": "^9.3.0",
     "@nestjs/cli": "^11.0.16",
+    "@nestjs/schedule": "^6.1.1",
     "@nestjs/testing": "^11.1.12",
     "@types/argon2": "^0.14.1",
     "@types/bcrypt": "^5.0.2",
+    "@types/cron": "^2.0.1",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/multer": "^1.4.11",

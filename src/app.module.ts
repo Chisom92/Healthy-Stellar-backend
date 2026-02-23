@@ -3,6 +3,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_PIPE, APP_INTERCEPTOR } from '@nestjs/core';
@@ -26,6 +27,7 @@ import { MedicalEmergencyErrorFilter } from './common/errors/medical-emergency-e
 import { MedicalDataValidationPipe } from './common/validation/medical-data.validator.pipe';
 import { TenantInterceptor } from './tenant/interceptors/tenant.interceptor';
 import { AuditLogEntity } from './common/audit/audit-log.entity';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -37,6 +39,7 @@ import { AuditLogEntity } from './common/audit/audit-log.entity';
     TypeOrmModule.forRootAsync({
       useClass: DatabaseConfig,
     }),
+    ScheduleModule.forRoot(),
     // Rate limiting and throttling for security
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
@@ -87,6 +90,7 @@ import { AuditLogEntity } from './common/audit/audit-log.entity';
     QueueModule,
     FhirModule,
     AccessControlModule,
+    JobsModule,
     StellarModule,
   ],
   controllers: [AppController, HealthController],
