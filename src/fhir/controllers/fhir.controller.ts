@@ -1,5 +1,16 @@
-<<<<<<< Updated upstream
 import { Controller, Get, Param, Query, UseFilters, UseGuards, Delete, Req, Res, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  UseFilters,
+  UseGuards,
+  Delete,
+  Req,
+  Res,
+  HttpStatus,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { FhirService } from '../fhir.service';
 import { BulkExportService } from '../services/bulk-export.service';
@@ -54,7 +65,8 @@ export class FhirController {
       query._type,
     );
 
-    res.status(HttpStatus.ACCEPTED)
+    res
+      .status(HttpStatus.ACCEPTED)
       .header('Content-Location', `/fhir/r4/$export-status/${jobId}`)
       .send();
   }
@@ -92,6 +104,6 @@ export class FhirController {
   @ApiResponse({ status: 400, description: 'Validation failed' })
   importFromFhir(@Body() resource: any) {
     return this.fhirService.convertFromFhir(resource);
->>>>>>> Stashed changes
+ Stashed changes
   }
 }

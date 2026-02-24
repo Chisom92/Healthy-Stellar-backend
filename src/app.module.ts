@@ -17,12 +17,17 @@ import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { InfectionControlModule } from './infection-control/infection-control.module';
 import { EmergencyOperationsModule } from './emergency-operations/emergency-operations.module';
 import { AccessControlModule } from './access-control/access-control.module';
-<<<<<<< Updated upstream
 import { ReportsModule } from './reports/reports.module';
 import { TenantModule } from './tenant/tenant.module';
-=======
 import { FhirModule } from './fhir/fhir.module';
->>>>>>> Stashed changes
+=======
+import { EmergencyOperationsModule } from './emergency-operations/emergency-operations.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { QueueModule } from './queues/queue.module';
+import { FhirModule } from './fhir/fhir.module';
+import { AccessControlModule } from './access-control/access-control.module';
+import { StellarModule } from './stellar/stellar.module';
+ main
 import { DatabaseConfig } from './config/database.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -33,6 +38,14 @@ import { MedicalDataValidationPipe } from './common/validation/medical-data.vali
 import { NotificationsModule } from './notifications/notifications.module';
 import { QueueModule } from './queues/queue.module';
 import { TenantConfigModule } from './tenant-config/tenant-config.module';
+import { GdprModule } from './gdpr/gdpr.module';
+import { TenantInterceptor } from './tenant/interceptors/tenant.interceptor';
+import { JobsModule } from './jobs/jobs.module';
+import { AuditModule } from './common/audit/audit.module';
+import { FhirModule } from './fhir/fhir.module';
+import { StellarModule } from './stellar/stellar.module';
+import { CustomThrottlerGuard } from './common/guards/custom-throttler.guard';
+import { ThrottlerConfigService } from './common/throttler/throttler-config.service';
 
 const hasBearerAuthUser = (req: any): boolean => {
   const authHeader = req?.headers?.authorization;
@@ -55,7 +68,10 @@ const hasBearerAuthUser = (req: any): boolean => {
   }
 
   try {
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as Record<string, any>;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as Record<
+      string,
+      any
+    >;
     return Boolean(payload?.userId);
   } catch {
     return false;
@@ -79,7 +95,10 @@ const getUserTrackerFromRequest = (req: any): string => {
   }
 
   try {
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as Record<string, any>;
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as Record<
+      string,
+      any
+    >;
     if (payload?.userId) {
       return `user:${payload.userId}`;
     }
@@ -93,9 +112,6 @@ const getUserTrackerFromRequest = (req: any): string => {
 
   return req?.ip || 'unknown-ip';
 };
-import { TenantInterceptor } from './tenant/interceptors/tenant.interceptor';
-import { JobsModule } from './jobs/jobs.module';
-import { AuditModule } from './common/audit/audit.module';
 
 @Module({
   imports: [
@@ -134,22 +150,22 @@ import { AuditModule } from './common/audit/audit.module';
     QueueModule,
     FhirModule,
     AccessControlModule,
-<<<<<<< Updated upstream
     JobsModule,
     StellarModule,
     AuditModule,
     ReportsModule,
     TenantConfigModule,
-=======
     FhirModule,
->>>>>>> Stashed changes
+=======
+    GdprModule,
+ main
   ],
   controllers: [AppController],
   providers: [
     AppService,
     {
       provide: APP_INTERCEPTOR,
-      useClass: TenantInterceptor
+      useClass: TenantInterceptor,
     },
     {
       provide: APP_FILTER,
@@ -165,4 +181,4 @@ import { AuditModule } from './common/audit/audit.module';
     },
   ],
 })
-export class AppModule { }
+export class AppModule {}
