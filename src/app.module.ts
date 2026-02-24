@@ -19,6 +19,12 @@ import { EmergencyOperationsModule } from './emergency-operations/emergency-oper
 import { AccessControlModule } from './access-control/access-control.module';
 import { ReportsModule } from './reports/reports.module';
 import { TenantModule } from './tenant/tenant.module';
+import { EmergencyOperationsModule } from './emergency-operations/emergency-operations.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { QueueModule } from './queues/queue.module';
+import { FhirModule } from './fhir/fhir.module';
+import { AccessControlModule } from './access-control/access-control.module';
+import { StellarModule } from './stellar/stellar.module';
 import { DatabaseConfig } from './config/database.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
