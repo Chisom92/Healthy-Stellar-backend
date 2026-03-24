@@ -55,9 +55,6 @@ export class PatientsService {
     return patient;
   }
 
-  async findAll() {
-    const patients = await this.patientRepo.find();
-    return patients;
   async findByMRN(mrn: string): Promise<Patient | null> {
     if (!(this.patientRepo as any).findOneBy) return null;
     return (this.patientRepo as any).findOneBy({ mrn });
@@ -109,9 +106,6 @@ export class PatientsService {
     });
   }
 
-    return qb.getMany();
-  }
-
   /**
    * -----------------------------
    * Admit patient
@@ -155,7 +149,6 @@ export class PatientsService {
     return !!match;
   }
 
-  async attachPhoto(patientId: string, file: Express.Multer.File): Promise<Patient> {
   async update(id: string, updateData: Partial<Patient>): Promise<Patient> {
     await (this.patientRepo as any).update(id, updateData);
     const updated = await (this.patientRepo as any).findOneBy?.({ id });
@@ -167,21 +160,23 @@ export class PatientsService {
     await (this.patientRepo as any).update(id, { isActive: false });
   }
 
-async attachPhoto(
+  async updateProfile(
+    stellarAddress: string,
+    profileData: Partial<Pick<Patient, 'phone' | 'email' | 'address' | 'contactPreferences' | 'emergencyContact' | 'primaryLanguage' | 'genderIdentity'>>,
+  ): Promise<Patient> {
+    const patient = await this.patientRepo.findOne({ where: { stellarAddress } });
+    if (!patient) throw new NotFoundException('Patient not found');
+    Object.assign(patient, profileData);
+    return this.patientRepo.save(patient);
+  }
+
+  async attachPhoto(
     patientId: string,
     file: Express.Multer.File,
   ): Promise<Patient> {
-    const patient = await this.patientRepo.findOne({
-      where: { id: patientId },
-    });
-
-    if (!patient) {
-      throw new NotFoundException('Patient not found');
-    }
-
-    // Save relative path in DB
+    const patient = await this.patientRepo.findOne({ where: { id: patientId } });
+    if (!patient) throw new NotFoundException('Patient not found');
     patient.patientPhotoUrl = `/uploads/patients/photos/${file.filename}`;
-
     return this.patientRepo.save(patient);
   }
 }

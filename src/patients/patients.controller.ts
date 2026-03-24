@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UploadedFile,
@@ -12,10 +13,10 @@ import {
 } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
-
-// Guards (assumed to exist in the project)
+import { UpdatePatientProfileDto } from './dto/update-patient-profile.dto';
 import { PatientPrivacyGuard } from './guards/patient-privacy.guard';
 import { AdminGuard } from './guards/admin-guard';
+import { PatientOwnerGuard } from './guards/patient-owner.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -94,6 +95,22 @@ export class PatientsController {
    * -----------------------------
    * - ONLY ADMIN CAN ADMIT A Patient
    */
+
+  /**
+   * -----------------------------
+   * Update Patient Profile (off-chain metadata)
+   * -----------------------------
+   * - Patient can only update their own profile
+   * - stellarAddress and nationalIdHash are immutable (not in DTO)
+   */
+  @Patch(':address/profile')
+  @UseGuards(PatientOwnerGuard)
+  async updateProfile(
+    @Param('address') address: string,
+    @Body() dto: UpdatePatientProfileDto,
+  ) {
+    return this.patientsService.updateProfile(address, dto);
+  }
 
   /**
    * -----------------------------
