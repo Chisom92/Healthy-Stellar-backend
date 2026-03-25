@@ -38,6 +38,8 @@ import { OptionalJwtAuthGuard } from './guards/optional-jwt-auth.guard';
 import { ApiKeyGuard } from './guards/api-key.guard';
 import { ProviderDirectoryService } from './services/provider-directory.service';
 
+import { RefreshTokenStoreService } from './services/refresh-token-store.service';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, MfaEntity, SessionEntity, ApiKey, ProviderAvailability, AuditLogEntity]),
@@ -64,6 +66,7 @@ import { ProviderDirectoryService } from './services/provider-directory.service'
     ProviderAvailabilityService,
     AuditService,
     ProviderDirectoryService,
+    RefreshTokenStoreService,
     ApiKeyStrategy,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
@@ -82,6 +85,7 @@ import { ProviderDirectoryService } from './services/provider-directory.service'
     ProviderAvailabilityService,
     AuditService,
     ProviderDirectoryService,
+    RefreshTokenStoreService,
     JwtAuthGuard,
     OptionalJwtAuthGuard,
     RolesGuard,

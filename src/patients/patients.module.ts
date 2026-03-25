@@ -9,12 +9,17 @@ import { AccessGrant } from '../access-control/entities/access-grant.entity';
 import { PatientPrivacyGuard } from './guards/patient-privacy.guard';
 import { GeoRestrictionGuard } from './guards/geo-restriction.guard';
 import { AuthModule } from '../auth/auth.module';
+import { PatientProvidersController } from './controllers/patient-providers.controller';
+import { PatientProvidersService } from './services/patient-providers.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Patient, MedicalHistory, AccessGrant]),
     AuthModule,
   ],
+  controllers: [PatientsController, PatientProvidersController],
+  providers: [PatientsService, PatientPrivacyGuard, PatientProvidersService],
+  exports: [PatientsService],
   controllers: [PatientsController],
   providers: [PatientsService, PatientTimelineService, PatientPrivacyGuard, GeoRestrictionGuard],
   exports: [PatientsService, PatientTimelineService, GeoRestrictionGuard],

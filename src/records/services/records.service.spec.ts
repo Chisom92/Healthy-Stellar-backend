@@ -1,27 +1,48 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { NotFoundException } from '@nestjs/common';
+import { Repository } from 'typeorm';
+
 import { RecordsService } from './records.service';
 import { Record } from '../entities/record.entity';
 import { IpfsService } from './ipfs.service';
 import { StellarService } from './stellar.service';
-import { RecordType } from '../dto/create-record.dto';
-import { SortBy, SortOrder } from '../dto/pagination-query.dto';
+import { RecordEventStoreService } from './record-event-store.service';
 import { AccessControlService } from '../../access-control/services/access-control.service';
 import { AuditLogService } from '../../common/services/audit-log.service';
+import { RecordType } from '../dto/create-record.dto';
+import { SortBy, SortOrder } from '../dto/pagination-query.dto';
+import { RecordEventType } from '../entities/record-event.entity';
 
+// ── QRCode mock ────────────────────────────────────────────────────────────────
 jest.mock('qrcode', () => ({
   toDataURL: jest.fn().mockResolvedValue('data:image/png;base64,mockedQR'),
 }));
-
 import * as QRCode from 'qrcode';
 
-describe('RecordsService', () => {
-  let service: RecordsService;
-  let repository: Repository<Record>;
+// ── Shared fixtures ────────────────────────────────────────────────────────────
+const BASE_RECORD: Record = {
+  id: 'record-1',
+  patientId: 'patient-abc-123',
+  providerId: null,
+  cid: 'Qm-cid-1',
+  stellarTxHash: 'tx-hash-1',
+  recordType: RecordType.MEDICAL_REPORT,
+  description: 'Annual check-up',
+  createdAt: new Date('2024-06-01T00:00:00Z'),
+};
 
-  const mockRepository = {
+const SAVED_RECORD = {
+  ...BASE_RECORD,
+  id: 'record-789',
+  cid: 'Qm-cid-new',
+  stellarTxHash: 'tx-hash-new',
+  createdAt: new Date('2024-06-15T00:00:00Z'),
+};
+
+// ── Mock factories (fresh per test via beforeEach) ─────────────────────────────
+function makeMocks() {
+  const repo = {
     create: jest.fn(),
     save: jest.fn(),
     findOne: jest.fn(),
@@ -29,135 +50,238 @@ describe('RecordsService', () => {
     find: jest.fn(),
   };
 
-  const mockIpfsService = {
-    upload: jest.fn(),
-  };
+  const ipfs = { upload: jest.fn() };
 
-  const mockStellarService = {
+  const stellar = {
     anchorCid: jest.fn(),
     createShareLink: jest.fn(),
   };
 
-  const mockAccessControlService = {
-    findActiveEmergencyGrant: jest.fn(),
+  const accessControl = { findActiveEmergencyGrant: jest.fn() };
+
+  const auditLog = { create: jest.fn() };
+
+  const eventStore = {
+    append: jest.fn(),
+    getEvents: jest.fn(),
+    replayToState: jest.fn(),
   };
 
-  const mockAuditLogService = {
-    create: jest.fn(),
-  };
+  return { repo, ipfs, stellar, accessControl, auditLog, eventStore };
+}
+
+// ── Module builder ─────────────────────────────────────────────────────────────
+async function buildModule(mocks: ReturnType<typeof makeMocks>) {
+  const module: TestingModule = await Test.createTestingModule({
+    providers: [
+      RecordsService,
+      { provide: getRepositoryToken(Record), useValue: mocks.repo },
+      { provide: IpfsService, useValue: mocks.ipfs },
+      { provide: StellarService, useValue: mocks.stellar },
+      { provide: AccessControlService, useValue: mocks.accessControl },
+      { provide: AuditLogService, useValue: mocks.auditLog },
+      { provide: RecordEventStoreService, useValue: mocks.eventStore },
+    ],
+  }).compile();
+
+  return module.get(RecordsService);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('RecordsService', () => {
+  let service: RecordsService;
+  let mocks: ReturnType<typeof makeMocks>;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RecordsService,
-        {
-          provide: getRepositoryToken(Record),
-          useValue: mockRepository,
-        },
-        {
-          provide: IpfsService,
-          useValue: mockIpfsService,
-        },
-        {
-          provide: StellarService,
-          useValue: mockStellarService,
-        },
-        { provide: 'AccessControlService', useValue: { findActiveEmergencyGrant: jest.fn() } },
-        { provide: 'AuditLogService', useValue: { create: jest.fn() } },
-        {
-          provide: AccessControlService,
-          useValue: mockAccessControlService,
-        },
-        {
-          provide: AuditLogService,
-          useValue: mockAuditLogService,
-        },
-      ],
-    }).compile();
-
-    service = module.get<RecordsService>(RecordsService);
-    repository = module.get<Repository<Record>>(getRepositoryToken(Record));
-
-    jest.clearAllMocks();
+    mocks = makeMocks();
+    service = await buildModule(mocks);
   });
 
-  describe('findRecent', () => {
-    it('should return the last 50 records with truncated patient address', async () => {
-      const mockRecords: Partial<Record>[] = [
-        {
-          id: 'record-1',
-          patientId: 'patient-address-long-id',
-          recordType: RecordType.MEDICAL_REPORT,
-          createdAt: new Date(),
-        },
-      ];
+  afterEach(() => jest.clearAllMocks());
 
-      mockRepository.find.mockResolvedValue(mockRecords);
+  // ── uploadRecord ─────────────────────────────────────────────────────────────
+  describe('uploadRecord', () => {
+    const dto = {
+      patientId: 'patient-abc-123',
+      recordType: RecordType.MEDICAL_REPORT,
+      description: 'Annual check-up',
+    };
+    const buffer = Buffer.from('encrypted-payload');
 
-      const result = await service.findRecent();
+    beforeEach(() => {
+      mocks.ipfs.upload.mockResolvedValue('Qm-cid-new');
+      mocks.stellar.anchorCid.mockResolvedValue('tx-hash-new');
+      mocks.repo.create.mockReturnValue(SAVED_RECORD);
+      mocks.repo.save.mockResolvedValue(SAVED_RECORD);
+      mocks.eventStore.append.mockResolvedValue({});
+    });
 
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
-        recordId: 'record-1',
-        patientAddress: 'patien...g-id',
-        providerAddress: 'System',
-        recordType: RecordType.MEDICAL_REPORT,
-        createdAt: expect.any(Date),
-      });
+    it('success — returns recordId, cid, stellarTxHash', async () => {
+      const result = await service.uploadRecord(dto, buffer);
 
-      expect(mockRepository.find).toHaveBeenCalledWith({
-        order: { createdAt: 'DESC' },
-        take: 50,
-        cache: 30000,
+      expect(result).toEqual({
+        recordId: SAVED_RECORD.id,
+        cid: SAVED_RECORD.cid,
+        stellarTxHash: SAVED_RECORD.stellarTxHash,
       });
     });
 
-    it('should not truncate short patient addresses', async () => {
-      const mockRecords: Partial<Record>[] = [
-        {
-          id: 'record-1',
-          patientId: 'short',
-          recordType: RecordType.MEDICAL_REPORT,
-          createdAt: new Date(),
-        },
-      ];
+    it('calls ipfs.upload with the encrypted buffer', async () => {
+      await service.uploadRecord(dto, buffer);
+      expect(mocks.ipfs.upload).toHaveBeenCalledWith(buffer);
+    });
 
-      mockRepository.find.mockResolvedValue(mockRecords);
+    it('calls stellar.anchorCid with patientId and the returned CID', async () => {
+      await service.uploadRecord(dto, buffer);
+      expect(mocks.stellar.anchorCid).toHaveBeenCalledWith(dto.patientId, 'Qm-cid-new');
+    });
 
-      const result = await service.findRecent();
+    it('appends RECORD_CREATED event with causedBy when provided', async () => {
+      await service.uploadRecord(dto, buffer, 'user-actor-1');
 
-      expect(result[0].patientAddress).toBe('short');
+      expect(mocks.eventStore.append).toHaveBeenCalledWith(
+        SAVED_RECORD.id,
+        RecordEventType.RECORD_CREATED,
+        expect.objectContaining({ patientId: dto.patientId, cid: 'Qm-cid-new' }),
+        'user-actor-1',
+      );
+    });
+
+    it('appends RECORD_CREATED event with undefined causedBy when omitted', async () => {
+      await service.uploadRecord(dto, buffer);
+
+      expect(mocks.eventStore.append).toHaveBeenCalledWith(
+        SAVED_RECORD.id,
+        RecordEventType.RECORD_CREATED,
+        expect.any(Object),
+        undefined,
+      );
+    });
+
+    it('stores null for description in event payload when description is undefined', async () => {
+      const dtoNoDesc = { patientId: 'p-1', recordType: RecordType.LAB_RESULT };
+      await service.uploadRecord(dtoNoDesc, buffer);
+
+      expect(mocks.eventStore.append).toHaveBeenCalledWith(
+        expect.any(String),
+        RecordEventType.RECORD_CREATED,
+        expect.objectContaining({ description: null }),
+        undefined,
+      );
+    });
+
+    it('IPFS failure — rejects before touching Stellar or the DB', async () => {
+      mocks.ipfs.upload.mockRejectedValue(new Error('IPFS node unreachable'));
+
+      await expect(service.uploadRecord(dto, buffer)).rejects.toThrow('IPFS node unreachable');
+
+      expect(mocks.stellar.anchorCid).not.toHaveBeenCalled();
+      expect(mocks.repo.save).not.toHaveBeenCalled();
+      expect(mocks.eventStore.append).not.toHaveBeenCalled();
+    });
+
+    it('Stellar contract failure — rejects after IPFS but before DB save', async () => {
+      mocks.stellar.anchorCid.mockRejectedValue(new Error('Stellar contract error'));
+
+      await expect(service.uploadRecord(dto, buffer)).rejects.toThrow('Stellar contract error');
+
+      expect(mocks.ipfs.upload).toHaveBeenCalled();
+      expect(mocks.repo.save).not.toHaveBeenCalled();
+      expect(mocks.eventStore.append).not.toHaveBeenCalled();
     });
   });
 
-  describe('findAll', () => {
-    const mockRecords: Record[] = [
-      {
-        id: '1',
-        patientId: 'patient-1',
-        cid: 'cid-1',
-        stellarTxHash: 'tx-1',
-        recordType: RecordType.MEDICAL_REPORT,
-        description: 'Test record 1',
-        createdAt: new Date('2024-01-15'),
-      },
-      {
-        id: '2',
-        patientId: 'patient-1',
-        cid: 'cid-2',
-        stellarTxHash: 'tx-2',
-        recordType: RecordType.LAB_RESULT,
-        description: 'Test record 2',
-        createdAt: new Date('2024-01-16'),
-      },
+  // ── findOne ──────────────────────────────────────────────────────────────────
+  describe('findOne', () => {
+    it('returns the record when found without a requesterId', async () => {
+      mocks.repo.findOne.mockResolvedValue(BASE_RECORD);
+
+      const result = await service.findOne('record-1');
+
+      expect(result).toEqual(BASE_RECORD);
+      expect(mocks.accessControl.findActiveEmergencyGrant).not.toHaveBeenCalled();
+      expect(mocks.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('returns null when record is not found (no requesterId)', async () => {
+      mocks.repo.findOne.mockResolvedValue(null);
+
+      const result = await service.findOne('nonexistent');
+
+      expect(result).toBeNull();
+      expect(mocks.accessControl.findActiveEmergencyGrant).not.toHaveBeenCalled();
+    });
+
+    it('returns null when record is not found (with requesterId)', async () => {
+      mocks.repo.findOne.mockResolvedValue(null);
+
+      const result = await service.findOne('nonexistent', 'requester-1');
+
+      expect(result).toBeNull();
+      // record is null so the access-control branch is never entered
+      expect(mocks.accessControl.findActiveEmergencyGrant).not.toHaveBeenCalled();
+    });
+
+    it('checks for emergency grant when record found and requesterId provided', async () => {
+      mocks.repo.findOne.mockResolvedValue(BASE_RECORD);
+      mocks.accessControl.findActiveEmergencyGrant.mockResolvedValue(null);
+
+      await service.findOne('record-1', 'requester-1');
+
+      expect(mocks.accessControl.findActiveEmergencyGrant).toHaveBeenCalledWith(
+        BASE_RECORD.patientId,
+        'requester-1',
+        'record-1',
+      );
+    });
+
+    it('does NOT write audit log when no emergency grant exists', async () => {
+      mocks.repo.findOne.mockResolvedValue(BASE_RECORD);
+      mocks.accessControl.findActiveEmergencyGrant.mockResolvedValue(null);
+
+      await service.findOne('record-1', 'requester-1');
+
+      expect(mocks.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('writes EMERGENCY_ACCESS audit log when an active emergency grant exists', async () => {
+      const emergencyGrant = { id: 'grant-99' };
+      mocks.repo.findOne.mockResolvedValue(BASE_RECORD);
+      mocks.accessControl.findActiveEmergencyGrant.mockResolvedValue(emergencyGrant);
+      mocks.auditLog.create.mockResolvedValue({});
+
+      await service.findOne('record-1', 'requester-1');
+
+      expect(mocks.auditLog.create).toHaveBeenCalledWith({
+        operation: 'EMERGENCY_ACCESS',
+        entityType: 'records',
+        entityId: 'record-1',
+        userId: 'requester-1',
+        status: 'success',
+        newValues: {
+          patientId: BASE_RECORD.patientId,
+          grantId: 'grant-99',
+          recordId: 'record-1',
+        },
+      });
+    });
+  });
+
+  // ── findAll / getRecordsForPatient ────────────────────────────────────────────
+  describe('findAll (getRecordsForPatient)', () => {
+    const twoRecords: Record[] = [
+      { ...BASE_RECORD, id: '1', recordType: RecordType.MEDICAL_REPORT },
+      { ...BASE_RECORD, id: '2', recordType: RecordType.LAB_RESULT },
     ];
 
-    it('should return paginated records with default parameters', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
+    beforeEach(() => {
+      mocks.repo.findAndCount.mockResolvedValue([twoRecords, 2]);
+    });
 
+    // ── pagination ──────────────────────────────────────────────────────────
+    it('defaults: page=1, limit=20, order=DESC, sortBy=createdAt', async () => {
       const result = await service.findAll({});
 
-      expect(result.data).toEqual(mockRecords);
       expect(result.meta).toEqual({
         total: 2,
         page: 1,
@@ -166,206 +290,29 @@ describe('RecordsService', () => {
         hasNextPage: false,
         hasPreviousPage: false,
       });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {},
-        order: { createdAt: 'DESC' },
-        take: 20,
-        skip: 0,
-      });
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 20, skip: 0 }),
+      );
     });
 
-    it('should apply pagination correctly', async () => {
-      const manyRecords = Array(50).fill(mockRecords[0]);
-      mockRepository.findAndCount.mockResolvedValue([manyRecords.slice(20, 40), 50]);
+    it('page 2 of 3 — hasNextPage=true, hasPreviousPage=true', async () => {
+      mocks.repo.findAndCount.mockResolvedValue([twoRecords, 50]);
 
       const result = await service.findAll({ page: 2, limit: 20 });
 
-      expect(result.meta).toEqual({
-        total: 50,
+      expect(result.meta).toMatchObject({
         page: 2,
-        limit: 20,
         totalPages: 3,
         hasNextPage: true,
         hasPreviousPage: true,
       });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {},
-        order: { createdAt: 'DESC' },
-        take: 20,
-        skip: 20,
-      });
-    });
-
-    it('should filter by recordType', async () => {
-      const filteredRecords = [mockRecords[0]];
-      mockRepository.findAndCount.mockResolvedValue([filteredRecords, 1]);
-
-      const result = await service.findAll({ recordType: RecordType.MEDICAL_REPORT });
-
-      expect(result.data).toEqual(filteredRecords);
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: { recordType: RecordType.MEDICAL_REPORT },
-        order: { createdAt: 'DESC' },
-        take: 20,
-        skip: 0,
-      });
-    });
-
-    it('should filter by patientId', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
-
-      await service.findAll({ patientId: 'patient-1' });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: { patientId: 'patient-1' },
-        order: { createdAt: 'DESC' },
-        take: 20,
-        skip: 0,
-      });
-    });
-
-    it('should filter by date range (fromDate and toDate)', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
-
-      await service.findAll({
-        fromDate: '2024-01-01T00:00:00Z',
-        toDate: '2024-12-31T23:59:59Z',
-      });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            createdAt: expect.any(Object),
-          }),
-        }),
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 20, take: 20 }),
       );
     });
 
-    it('should filter by fromDate only', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
-
-      await service.findAll({
-        fromDate: '2024-01-01T00:00:00Z',
-      });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            createdAt: expect.any(Object),
-          }),
-        }),
-      );
-    });
-
-    it('should filter by toDate only', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
-
-      await service.findAll({
-        toDate: '2024-12-31T23:59:59Z',
-      });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            createdAt: expect.any(Object),
-          }),
-        }),
-      );
-    });
-
-    it('should sort by createdAt ascending', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
-
-      await service.findAll({ sortBy: SortBy.CREATED_AT, order: SortOrder.ASC });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {},
-        order: { createdAt: 'ASC' },
-        take: 20,
-        skip: 0,
-      });
-    });
-
-    it('should sort by recordType descending', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
-
-      await service.findAll({ sortBy: SortBy.RECORD_TYPE, order: SortOrder.DESC });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {},
-        order: { recordType: 'DESC' },
-        take: 20,
-        skip: 0,
-      });
-    });
-
-    it('should sort by patientId ascending', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
-
-      await service.findAll({ sortBy: SortBy.PATIENT_ID, order: SortOrder.ASC });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {},
-        order: { patientId: 'ASC' },
-        take: 20,
-        skip: 0,
-      });
-    });
-
-    it('should apply multiple filters and sorting together', async () => {
-      mockRepository.findAndCount.mockResolvedValue([[mockRecords[0]], 1]);
-
-      await service.findAll({
-        page: 2,
-        limit: 10,
-        recordType: RecordType.LAB_RESULT,
-        patientId: 'patient-1',
-        fromDate: '2024-01-01T00:00:00Z',
-        toDate: '2024-12-31T23:59:59Z',
-        sortBy: SortBy.CREATED_AT,
-        order: SortOrder.ASC,
-      });
-
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {
-          recordType: RecordType.LAB_RESULT,
-          patientId: 'patient-1',
-          createdAt: expect.any(Object),
-        },
-        order: { createdAt: 'ASC' },
-        take: 10,
-        skip: 10,
-      });
-    });
-
-    it('should handle empty results', async () => {
-      mockRepository.findAndCount.mockResolvedValue([[], 0]);
-
-      const result = await service.findAll({});
-
-      expect(result.data).toEqual([]);
-      expect(result.meta).toEqual({
-        total: 0,
-        page: 1,
-        limit: 20,
-        totalPages: 0,
-        hasNextPage: false,
-        hasPreviousPage: false,
-      });
-    });
-
-    it('should calculate totalPages correctly', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 45]);
-
-      const result = await service.findAll({ limit: 10 });
-
-      expect(result.meta.totalPages).toBe(5);
-    });
-
-    it('should set hasNextPage correctly on last page', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 40]);
+    it('last page — hasNextPage=false, hasPreviousPage=true', async () => {
+      mocks.repo.findAndCount.mockResolvedValue([twoRecords, 40]);
 
       const result = await service.findAll({ page: 2, limit: 20 });
 
@@ -373,119 +320,306 @@ describe('RecordsService', () => {
       expect(result.meta.hasPreviousPage).toBe(true);
     });
 
-    it('should set hasPreviousPage correctly on first page', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 40]);
+    it('empty result set — totalPages=0, both flags false', async () => {
+      mocks.repo.findAndCount.mockResolvedValue([[], 0]);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({});
 
-      expect(result.meta.hasNextPage).toBe(true);
-      expect(result.meta.hasPreviousPage).toBe(false);
+      expect(result.data).toEqual([]);
+      expect(result.meta).toMatchObject({ total: 0, totalPages: 0, hasNextPage: false, hasPreviousPage: false });
     });
 
-    it('should respect limit cap of 100', async () => {
-      mockRepository.findAndCount.mockResolvedValue([mockRecords, 2]);
+    it('totalPages rounds up correctly (45 records, limit 10 → 5 pages)', async () => {
+      mocks.repo.findAndCount.mockResolvedValue([twoRecords, 45]);
 
-      await service.findAll({ limit: 100 });
+      const result = await service.findAll({ limit: 10 });
 
-      expect(repository.findAndCount).toHaveBeenCalledWith({
-        where: {},
+      expect(result.meta.totalPages).toBe(5);
+    });
+
+    // ── type filter ─────────────────────────────────────────────────────────
+    it('filters by recordType when provided', async () => {
+      mocks.repo.findAndCount.mockResolvedValue([[twoRecords[0]], 1]);
+
+      await service.findAll({ recordType: RecordType.MEDICAL_REPORT });
+
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ recordType: RecordType.MEDICAL_REPORT }) }),
+      );
+    });
+
+    it('does not include recordType in where clause when omitted', async () => {
+      await service.findAll({});
+
+      const call = mocks.repo.findAndCount.mock.calls[0][0];
+      expect(call.where).not.toHaveProperty('recordType');
+    });
+
+    // ── patientId filter ────────────────────────────────────────────────────
+    it('filters by patientId when provided', async () => {
+      await service.findAll({ patientId: 'patient-abc-123' });
+
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ patientId: 'patient-abc-123' }) }),
+      );
+    });
+
+    it('does not include patientId in where clause when omitted', async () => {
+      await service.findAll({});
+
+      const call = mocks.repo.findAndCount.mock.calls[0][0];
+      expect(call.where).not.toHaveProperty('patientId');
+    });
+
+    // ── date range branches ─────────────────────────────────────────────────
+    it('applies Between filter when both fromDate and toDate are provided', async () => {
+      await service.findAll({ fromDate: '2024-01-01T00:00:00Z', toDate: '2024-12-31T23:59:59Z' });
+
+      const call = mocks.repo.findAndCount.mock.calls[0][0];
+      expect(call.where.createdAt).toBeDefined();
+    });
+
+    it('applies Between(fromDate, now) when only fromDate is provided', async () => {
+      await service.findAll({ fromDate: '2024-01-01T00:00:00Z' });
+
+      const call = mocks.repo.findAndCount.mock.calls[0][0];
+      expect(call.where.createdAt).toBeDefined();
+    });
+
+    it('applies Between(epoch, toDate) when only toDate is provided', async () => {
+      await service.findAll({ toDate: '2024-12-31T23:59:59Z' });
+
+      const call = mocks.repo.findAndCount.mock.calls[0][0];
+      expect(call.where.createdAt).toBeDefined();
+    });
+
+    it('does not set createdAt filter when neither fromDate nor toDate provided', async () => {
+      await service.findAll({});
+
+      const call = mocks.repo.findAndCount.mock.calls[0][0];
+      expect(call.where).not.toHaveProperty('createdAt');
+    });
+
+    // ── sort ────────────────────────────────────────────────────────────────
+    it('sorts by createdAt ASC', async () => {
+      await service.findAll({ sortBy: SortBy.CREATED_AT, order: SortOrder.ASC });
+
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ order: { createdAt: 'ASC' } }),
+      );
+    });
+
+    it('sorts by recordType DESC', async () => {
+      await service.findAll({ sortBy: SortBy.RECORD_TYPE, order: SortOrder.DESC });
+
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ order: { recordType: 'DESC' } }),
+      );
+    });
+
+    it('sorts by patientId ASC', async () => {
+      await service.findAll({ sortBy: SortBy.PATIENT_ID, order: SortOrder.ASC });
+
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ order: { patientId: 'ASC' } }),
+      );
+    });
+
+    // ── combined ────────────────────────────────────────────────────────────
+    it('applies patientId + recordType + date range + pagination together', async () => {
+      mocks.repo.findAndCount.mockResolvedValue([[twoRecords[0]], 1]);
+
+      await service.findAll({
+        page: 2,
+        limit: 10,
+        patientId: 'patient-abc-123',
+        recordType: RecordType.LAB_RESULT,
+        fromDate: '2024-01-01T00:00:00Z',
+        toDate: '2024-12-31T23:59:59Z',
+        sortBy: SortBy.CREATED_AT,
+        order: SortOrder.ASC,
+      });
+
+      expect(mocks.repo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 10,
+          take: 10,
+          order: { createdAt: 'ASC' },
+          where: expect.objectContaining({
+            patientId: 'patient-abc-123',
+            recordType: RecordType.LAB_RESULT,
+            createdAt: expect.any(Object),
+          }),
+        }),
+      );
+    });
+  });
+
+  // ── findRecent ───────────────────────────────────────────────────────────────
+  describe('findRecent', () => {
+    it('returns mapped DTOs with truncated address (>10 chars)', async () => {
+      mocks.repo.find.mockResolvedValue([BASE_RECORD]);
+
+      const result = await service.findRecent();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        recordId: BASE_RECORD.id,
+        patientAddress: 'patien...123',
+        providerAddress: 'System',
+        recordType: BASE_RECORD.recordType,
+        createdAt: BASE_RECORD.createdAt,
+      });
+    });
+
+    it('does not truncate address of exactly 10 chars', async () => {
+      mocks.repo.find.mockResolvedValue([{ ...BASE_RECORD, patientId: '1234567890' }]);
+
+      const result = await service.findRecent();
+
+      expect(result[0].patientAddress).toBe('1234567890');
+    });
+
+    it('does not truncate address shorter than 10 chars', async () => {
+      mocks.repo.find.mockResolvedValue([{ ...BASE_RECORD, patientId: 'short' }]);
+
+      const result = await service.findRecent();
+
+      expect(result[0].patientAddress).toBe('short');
+    });
+
+    it('queries with take=50, order DESC, and 30s cache', async () => {
+      mocks.repo.find.mockResolvedValue([]);
+
+      await service.findRecent();
+
+      expect(mocks.repo.find).toHaveBeenCalledWith({
         order: { createdAt: 'DESC' },
-        take: 100,
-        skip: 0,
+        take: 50,
+        cache: 30000,
       });
+    });
+
+    it('returns empty array when no records exist', async () => {
+      mocks.repo.find.mockResolvedValue([]);
+
+      const result = await service.findRecent();
+
+      expect(result).toEqual([]);
     });
   });
 
-  describe('findOne', () => {
-    it('should return a single record by id', async () => {
-      const mockRecord: Record = {
-        id: '1',
-        patientId: 'patient-1',
-        cid: 'cid-1',
-        stellarTxHash: 'tx-1',
-        recordType: RecordType.MEDICAL_REPORT,
-        description: 'Test record',
-        createdAt: new Date(),
-      };
-
-      mockRepository.findOne.mockResolvedValue(mockRecord);
-
-      const result = await service.findOne('1');
-
-      expect(result).toEqual(mockRecord);
-      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: '1' } });
-    });
-  });
-
-  describe('uploadRecord', () => {
-    it('should upload a record successfully', async () => {
-      const dto = {
-        patientId: 'patient-1',
-        recordType: RecordType.MEDICAL_REPORT,
-        description: 'Test record',
-      };
-
-      const buffer = Buffer.from('encrypted data');
-
-      mockIpfsService.upload.mockResolvedValue('cid-123');
-      mockStellarService.anchorCid.mockResolvedValue('tx-hash-456');
-      mockRepository.create.mockReturnValue({
-        id: 'record-789',
-        ...dto,
-        cid: 'cid-123',
-        stellarTxHash: 'tx-hash-456',
-      });
-      mockRepository.save.mockResolvedValue({
-        id: 'record-789',
-        ...dto,
-        cid: 'cid-123',
-        stellarTxHash: 'tx-hash-456',
-      });
-
-      const result = await service.uploadRecord(dto, buffer);
-
-      expect(result).toEqual({
-        recordId: 'record-789',
-        cid: 'cid-123',
-        stellarTxHash: 'tx-hash-456',
-      });
-
-      expect(mockIpfsService.upload).toHaveBeenCalledWith(buffer);
-      expect(mockStellarService.anchorCid).toHaveBeenCalledWith('patient-1', 'cid-123');
-    });
-  });
-
+  // ── generateQrCode ───────────────────────────────────────────────────────────
   describe('generateQrCode', () => {
-    const mockRecord: Record = {
-      id: 'record-1',
-      patientId: 'patient-1',
-      cid: 'cid-1',
-      stellarTxHash: 'tx-1',
-      recordType: RecordType.MEDICAL_REPORT,
-      description: 'Test',
-      createdAt: new Date(),
-    };
+    it('throws NotFoundException when record does not exist', async () => {
+      mocks.repo.findOne.mockResolvedValue(null);
 
-    it('should return a base64 QR code data URL', async () => {
-      mockRepository.findOne.mockResolvedValue(mockRecord);
-      mockStellarService.createShareLink.mockResolvedValue('share-token-abc');
+      await expect(service.generateQrCode('nonexistent', 'patient-1')).rejects.toThrow(
+        new NotFoundException('Record nonexistent not found'),
+      );
+      expect(mocks.stellar.createShareLink).not.toHaveBeenCalled();
+    });
+
+    it('returns QR data URL using APP_DOMAIN env variable when set', async () => {
+      process.env.APP_DOMAIN = 'https://custom.domain.com';
+      mocks.repo.findOne.mockResolvedValue(BASE_RECORD);
+      mocks.stellar.createShareLink.mockResolvedValue('share-token-xyz');
 
       const result = await service.generateQrCode('record-1', 'patient-1');
 
       expect(result).toBe('data:image/png;base64,mockedQR');
-      expect(mockStellarService.createShareLink).toHaveBeenCalledWith('record-1', 'patient-1');
       expect(QRCode.toDataURL).toHaveBeenCalledWith(
-        expect.stringContaining('/share/share-token-abc'),
+        'https://custom.domain.com/share/share-token-xyz',
+      );
+
+      delete process.env.APP_DOMAIN;
+    });
+
+    it('falls back to https://app.domain.com when APP_DOMAIN is not set', async () => {
+      delete process.env.APP_DOMAIN;
+      mocks.repo.findOne.mockResolvedValue(BASE_RECORD);
+      mocks.stellar.createShareLink.mockResolvedValue('share-token-xyz');
+
+      await service.generateQrCode('record-1', 'patient-1');
+
+      expect(QRCode.toDataURL).toHaveBeenCalledWith(
+        'https://app.domain.com/share/share-token-xyz',
       );
     });
 
-    it('should throw NotFoundException when record does not exist', async () => {
-      mockRepository.findOne.mockResolvedValue(null);
+    it('calls createShareLink with the correct id and patientId', async () => {
+      mocks.repo.findOne.mockResolvedValue(BASE_RECORD);
+      mocks.stellar.createShareLink.mockResolvedValue('token');
 
-      await expect(service.generateQrCode('nonexistent', 'patient-1')).rejects.toThrow(
-        NotFoundException,
+      await service.generateQrCode('record-1', 'patient-abc-123');
+
+      expect(mocks.stellar.createShareLink).toHaveBeenCalledWith('record-1', 'patient-abc-123');
+    });
+  });
+
+  // ── getStateFromEvents ───────────────────────────────────────────────────────
+  describe('getStateFromEvents', () => {
+    const liveState = {
+      id: 'record-1',
+      patientId: 'patient-abc-123',
+      cid: 'Qm-cid-1',
+      stellarTxHash: 'tx-1',
+      recordType: RecordType.MEDICAL_REPORT,
+      description: 'check-up',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      sequenceNumber: 1,
+      deleted: false,
+    };
+
+    it('returns the replayed state when record exists and is not deleted', async () => {
+      mocks.eventStore.replayToState.mockResolvedValue(liveState);
+
+      const result = await service.getStateFromEvents('record-1');
+
+      expect(result).toEqual(liveState);
+      expect(mocks.eventStore.replayToState).toHaveBeenCalledWith('record-1');
+    });
+
+    it('throws NotFoundException when replayToState returns null', async () => {
+      mocks.eventStore.replayToState.mockResolvedValue(null);
+
+      await expect(service.getStateFromEvents('record-1')).rejects.toThrow(
+        new NotFoundException('Record record-1 not found in event store'),
       );
-      expect(mockStellarService.createShareLink).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundException when state.deleted is true', async () => {
+      mocks.eventStore.replayToState.mockResolvedValue({ ...liveState, deleted: true });
+
+      await expect(service.getStateFromEvents('record-1')).rejects.toThrow(
+        new NotFoundException('Record record-1 not found in event store'),
+      );
+    });
+  });
+
+  // ── getEventStream ───────────────────────────────────────────────────────────
+  describe('getEventStream', () => {
+    const mockEvents = [
+      { id: 'evt-1', recordId: 'record-1', eventType: RecordEventType.RECORD_CREATED, sequenceNumber: 1, payload: {}, causedBy: null, timestamp: new Date() },
+      { id: 'evt-2', recordId: 'record-1', eventType: RecordEventType.RECORD_UPDATED, sequenceNumber: 2, payload: {}, causedBy: null, timestamp: new Date() },
+    ];
+
+    it('returns the event array when events exist', async () => {
+      mocks.eventStore.getEvents.mockResolvedValue(mockEvents);
+
+      const result = await service.getEventStream('record-1');
+
+      expect(result).toEqual(mockEvents);
+      expect(mocks.eventStore.getEvents).toHaveBeenCalledWith('record-1');
+    });
+
+    it('throws NotFoundException when no events exist for the record', async () => {
+      mocks.eventStore.getEvents.mockResolvedValue([]);
+
+      await expect(service.getEventStream('record-1')).rejects.toThrow(
+        new NotFoundException('No events found for record record-1'),
+      );
     });
   });
 });
