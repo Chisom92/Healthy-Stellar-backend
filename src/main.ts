@@ -1,9 +1,7 @@
 import './tracing'; // Initialize tracing before any other imports
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { VersioningType, VERSION_NEUTRAL } from '@nestjs/common';
-import { I18nValidationPipe, I18nValidationExceptionFilter } from 'nestjs-i18n';
+import { I18nValidationPipe } from 'nestjs-i18n';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
@@ -11,6 +9,7 @@ import helmet from 'helmet';
 import { nonceMiddleware } from './common/middleware/nonce.middleware';
 import { DeprecationInterceptor } from './common/interceptors/deprecation.interceptor';
 import { Logger } from 'nestjs-pino';
+import { applySecurityHeaders } from './security/http-security.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -26,6 +25,8 @@ async function bootstrap() {
     defaultVersion: ['1', VERSION_NEUTRAL],
   });
 
+  // Security headers are shared with the integration test to keep runtime and verification aligned.
+  applySecurityHeaders(app);
   // Nonce generation middleware for CSP
   app.use(nonceMiddleware);
 
