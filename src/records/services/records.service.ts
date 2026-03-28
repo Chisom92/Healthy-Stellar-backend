@@ -1,10 +1,6 @@
 import { Injectable, Inject, forwardRef, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, Between } from 'typeorm';
-import { SearchRecordsDto } from '../dto/search-records.dto';
-import { SearchRecordsResponseDto, SearchRecordItem } from '../dto/search-records-response.dto';
-import { UserRole } from '../../auth/entities/user.entity';
-import * as QRCode from 'qrcode';
+import { Repository, FindOptionsWhere, Between, DataSource } from 'typeorm';
 import { Record } from '../entities/record.entity';
 import { RecordVersion } from '../entities/record-version.entity';
 import { CreateRecordDto } from '../dto/create-record.dto';
@@ -15,72 +11,60 @@ import { IpfsService } from './ipfs.service';
 import { StellarService } from './stellar.service';
 import { AccessControlService } from '../../access-control/services/access-control.service';
 import { AuditLogService } from '../../common/services/audit-log.service';
-import { RecordEventStoreService, RecordState } from './record-event-store.service';
-import { RecordEvent, RecordEventType } from '../entities/record-event.entity';
-import { PaginationUtil } from '../../common/utils/pagination.util';
-import { RecordVersionService } from './record-version.service';
+import { ProviderPatientRelationshipService } from '../../provider-patient/services/provider-patient-relationship.service';
 
 @Injectable()
 export class RecordsService {
   constructor(
     @InjectRepository(Record)
     private recordRepository: Repository<Record>,
+    private dataSource: DataSource,
     private ipfsService: IpfsService,
     private stellarService: StellarService,
     @Inject(forwardRef(() => AccessControlService))
     private accessControlService: AccessControlService,
     private auditLogService: AuditLogService,
-    private eventStore: RecordEventStoreService,
-    @Inject(forwardRef(() => RecordVersionService))
-    private recordVersionService: RecordVersionService,
+    @Inject(forwardRef(() => ProviderPatientRelationshipService))
+    private providerPatientService: ProviderPatientRelationshipService,
   ) {}
 
   async uploadRecord(
     dto: CreateRecordDto,
     encryptedBuffer: Buffer,
-    causedBy?: string,
+    providerId?: string,
   ): Promise<{ recordId: string; cid: string; stellarTxHash: string }> {
     const cid = await this.ipfsService.upload(encryptedBuffer);
     const stellarTxHash = await this.stellarService.anchorCid(dto.patientId, cid);
 
-    // Persist to the records table (read model / projection)
-    const record = this.recordRepository.create({
-      patientId: dto.patientId,
-      cid,
-      stellarTxHash,
-      recordType: dto.recordType,
-      description: dto.description,
-    });
-    const savedRecord = await this.recordRepository.save(record);
-
-    // Append the creation event to the event store
-    await this.eventStore.append(
-      savedRecord.id,
-      RecordEventType.RECORD_CREATED,
-      {
+    return this.dataSource.transaction(async (manager) => {
+      const record = manager.create(Record, {
         patientId: dto.patientId,
         cid,
         stellarTxHash,
         recordType: dto.recordType,
-        description: dto.description ?? null,
-        createdAt: savedRecord.createdAt,
-      },
-      causedBy,
-    );
+        description: dto.description,
+      });
 
-    // Persist version 1 — the immutable original
-    await this.recordVersionService.createInitialVersion(
-      savedRecord.id,
-      cid,
-      stellarTxHash,
-      causedBy ?? dto.patientId,
-    );
+      const savedRecord = await manager.save(record);
 
-    return {
-      recordId: savedRecord.id,
-      cid: savedRecord.cid,
-      stellarTxHash: savedRecord.stellarTxHash,
-    };
+      if (providerId) {
+        await manager.query(
+          `INSERT INTO provider_patient_relationships
+             ("providerId", "patientId", "firstInteractionAt", "recordCount")
+           VALUES ($1, $2, NOW(), 1)
+           ON CONFLICT ("providerId", "patientId")
+           DO UPDATE SET
+             "recordCount" = provider_patient_relationships."recordCount" + 1`,
+          [providerId, dto.patientId],
+        );
+      }
+
+      return {
+        recordId: savedRecord.id,
+        cid: savedRecord.cid,
+        stellarTxHash: savedRecord.stellarTxHash,
+      };
+    });
   }
 
   async findAll(query: PaginationQueryDto): Promise<PaginatedRecordsResponseDto> {

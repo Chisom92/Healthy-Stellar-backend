@@ -22,11 +22,7 @@ import { RecordVersionService } from './services/record-version.service';
 import { RecordDiffService } from './services/record-diff.service';
 import { CircuitBreakerModule } from '../common/circuit-breaker/circuit-breaker.module';
 import { AccessControlModule } from '../access-control/access-control.module';
-import { MedicalRbacModule } from '../roles/medical-rbac.module';
-import { EncryptionModule } from '../encryption/encryption.module';
-import { AuditModule } from '../common/audit/audit.module';
-import { RecordDownloadService } from './services/record-download.service';
-import { NotificationsModule } from '../notifications/notifications.module';
+import { ProviderPatientModule } from '../provider-patient/provider-patient.module';
 
 @Module({
   imports: [
@@ -36,35 +32,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ConfigModule,
     CircuitBreakerModule,
     forwardRef(() => AccessControlModule),
-    MedicalRbacModule,
-    EncryptionModule,
-    AuditModule,
-    NotificationsModule,
-  ],
-  controllers: [RecordsController, RecordTemplateController],
-  providers: [
-    RecordsService,
-    RelatedRecordsService,
-    RecordTemplateService,
-    IpfsService,
-    StellarService,
-    IpfsWithBreakerService,
-    RecordEventStoreService,
-    RecordDownloadService,
-    RecordSyncService,
-    RecordVersionService,
-    RecordDiffService,
-  ],
-  exports: [
-    RecordsService,
-    RelatedRecordsService,
-    RecordTemplateService,
-    IpfsWithBreakerService,
-    RecordEventStoreService,
-    RecordDownloadService,
-    RecordSyncService,
-    RecordVersionService,
-    RecordDiffService,
+    forwardRef(() => ProviderPatientModule),
   ],
 })
 export class RecordsModule {}
