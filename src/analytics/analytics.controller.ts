@@ -1,9 +1,10 @@
-import { Controller, Get, Query, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException, UseGuards, Header } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { AnalyticsService } from './analytics.service';
 import { OverviewResponseDto } from './dto/overview-response.dto';
 import { ActivityQueryDto, ActivityResponseDto } from './dto';
 import { TopProvidersResponseDto } from './dto/top-providers-response.dto';
+import { AdminStatsResponseDto } from './dto/admin-stats-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 
@@ -14,7 +15,17 @@ import { AdminGuard } from '../auth/guards/admin.guard';
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
+  @Get('stats')
+  @ApiOperation({ summary: 'Get platform-wide admin dashboard statistics' })
+  @ApiResponse({ status: 200, description: 'Dashboard stats returned', type: AdminStatsResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
+  async getStats(): Promise<AdminStatsResponseDto> {
+    return this.analyticsService.getStats();
+  }
+
   @Get('overview')
+  @Header('Cache-Control', 'max-age=60, stale-while-revalidate=30')
   @ApiOperation({ summary: 'Get system overview metrics' })
   @ApiResponse({
     status: 200,

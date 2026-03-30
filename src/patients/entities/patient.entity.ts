@@ -4,8 +4,13 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  VersionColumn,
   Index,
 } from 'typeorm';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  NotificationPreferences,
+} from '../types/notification-preferences.type';
 
 @Entity('patients')
 export class Patient {
@@ -80,6 +85,9 @@ export class Patient {
   @Column('json', { nullable: true })
   address?: string;
 
+  @Column({ default: false })
+  isPhoneVerified: boolean;
+
   /**
    * -----------------------------
    * Identification & Media
@@ -93,6 +101,29 @@ export class Patient {
 
   @Column({ nullable: true })
   nationalIdType?: string; // e.g., Passport, SSN, NIN
+
+  /**
+   * -----------------------------
+   * Stellar / Blockchain Identity
+   * -----------------------------
+   */
+  @Index()
+  @Column({ nullable: true, unique: true })
+  stellarAddress?: string; // immutable once set
+
+  @Column({ nullable: true })
+  nationalIdHash?: string; // SHA-256 hash of national ID — immutable once set
+
+  /**
+   * -----------------------------
+   * Off-chain Profile Metadata
+   * -----------------------------
+   */
+  @Column('json', { nullable: true })
+  contactPreferences?: Record<string, any>; // e.g. { preferredChannel: 'email', language: 'en' }
+
+  @Column('json', { nullable: true })
+  emergencyContact?: Record<string, any>; // e.g. { name, phone, relationship }
 
   /**
    * -----------------------------
@@ -121,6 +152,14 @@ export class Patient {
   @Column('simple-array', { nullable: true, default: null })
   allowedCountries: string[] | null;
 
+  @Column({
+    type: 'jsonb',
+    nullable: false,
+    default: () =>
+      `'${JSON.stringify(DEFAULT_NOTIFICATION_PREFERENCES)}'`,
+  })
+  notificationPreferences: NotificationPreferences;
+
   /**
    * -----------------------------
    * System Metadata
@@ -131,6 +170,10 @@ export class Patient {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  /** Optimistic concurrency — incremented by TypeORM on every save */
+  @VersionColumn({ default: 0 })
+  version: number;
 }
 
 export default Patient;

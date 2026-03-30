@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { User } from '../users/entities/user.entity';
@@ -10,6 +10,8 @@ import { StellarTransaction } from './entities/stellar-transaction.entity';
 import { OverviewResponseDto } from './dto/overview-response.dto';
 import { ActivityResponseDto, DailyActivityDto } from './dto/activity-response.dto';
 import { TopProvidersResponseDto, ProviderRankingDto } from './dto/top-providers-response.dto';
+import { AdminStatsResponseDto, RecordsByTypeDto, TopProviderDto } from './dto/admin-stats-response.dto';
+import { MedicalRole } from '../users/enums/medical-role.enum';
 
 @Injectable()
 export class AnalyticsService {
@@ -24,43 +26,54 @@ export class AnalyticsService {
     private readonly stellarTransactionRepository: Repository<StellarTransaction>,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async getOverview(): Promise<OverviewResponseDto> {
-      const cacheKey = 'analytics:overview';
+    const cacheKey = 'analytics:overview';
 
-      // Check cache first
-      const cached = await this.cacheManager.get<OverviewResponseDto>(cacheKey);
-      if (cached) {
-        return cached;
-      }
+    const cached = await this.cacheManager.get<OverviewResponseDto>(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
-      // Execute COUNT queries for all metrics
-      const totalUsers = await this.userRepository.count();
-      const totalRecords = await this.medicalRecordRepository.count();
-      const totalAccessGrants = await this.accessGrantRepository.count();
-      const stellarTransactions = await this.stellarTransactionRepository.count();
+    // All five COUNT queries run inside a single REPEATABLE READ transaction so
+    // every counter reflects the same consistent database snapshot, eliminating
+    // phantom reads caused by concurrent inserts between sequential queries.
+    const result = await this.dataSource.transaction('REPEATABLE READ', async (em) => {
+      const snapshotAt = new Date().toISOString();
 
-      // Count active grants: status is ACTIVE
-      const activeGrants = await this.accessGrantRepository.count({
-        where: {
-          status: GrantStatus.ACTIVE,
-        },
-      });
-
-      const result = {
+      const [
         totalUsers,
         totalRecords,
         totalAccessGrants,
         activeGrants,
         stellarTransactions,
-      };
+      ] = await Promise.all([
+        em.getRepository(User).count(),
+        em.getRepository(MedicalRecord).count(),
+        em.getRepository(AccessGrant).count(),
+        em.getRepository(AccessGrant).count({ where: { status: GrantStatus.ACTIVE } }),
+        em.getRepository(StellarTransaction).count(),
+      ]);
 
-      // Store in cache with 300-second TTL
-      await this.cacheManager.set(cacheKey, result, 300);
+      return {
+        totalUsers,
+        totalRecords,
+        totalAccessGrants,
+        activeGrants,
+        stellarTransactions,
+        lastUpdatedAt: snapshotAt,
+      } satisfies OverviewResponseDto;
+    });
 
-      return result;
-    }
+    // Cache for 60 s — aligns with the Cache-Control: max-age=60 HTTP header
+    // set by the controller so both layers expire at the same cadence.
+    await this.cacheManager.set(cacheKey, result, 60);
+
+    return result;
+  }
 
 
   async getActivity(from: Date, to: Date): Promise<ActivityResponseDto> {
@@ -129,6 +142,90 @@ export class AnalyticsService {
     // Store in cache with 300-second TTL
     await this.cacheManager.set(cacheKey, result, 300);
 
+    return result;
+  }
+
+  async getStats(): Promise<AdminStatsResponseDto> {
+    const CACHE_KEY = 'admin:stats';
+    const TTL_SECONDS = 300; // 5 minutes
+
+    const cached = await this.cacheManager.get<AdminStatsResponseDto>(CACHE_KEY);
+    if (cached) return cached;
+
+    const now = new Date();
+    const ago7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const ago30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [totalPatients, totalProviders, totalRecords, recordsLast7Days, recordsLast30Days, activeAccessGrants] =
+      await Promise.all([
+        // Total patients — users with PATIENT role
+        this.userRepository.count({ where: { role: MedicalRole.PATIENT } }),
+        // Total providers — all non-patient roles
+        this.userRepository
+          .createQueryBuilder('u')
+          .where('u.role != :role', { role: MedicalRole.PATIENT })
+          .getCount(),
+        // Total records
+        this.medicalRecordRepository.count(),
+        // Records last 7 days
+        this.medicalRecordRepository
+          .createQueryBuilder('r')
+          .where('r.createdAt >= :ago', { ago: ago7 })
+          .getCount(),
+        // Records last 30 days
+        this.medicalRecordRepository
+          .createQueryBuilder('r')
+          .where('r.createdAt >= :ago', { ago: ago30 })
+          .getCount(),
+        // Active access grants
+        this.accessGrantRepository.count({ where: { status: GrantStatus.ACTIVE } }),
+      ]);
+
+    // Top 5 providers by record count
+    const topProvidersRaw: { providerId: string; recordCount: string }[] =
+      await this.medicalRecordRepository
+        .createQueryBuilder('r')
+        .select('r.providerId', 'providerId')
+        .addSelect('COUNT(*)', 'recordCount')
+        .where('r.providerId IS NOT NULL')
+        .groupBy('r.providerId')
+        .orderBy('COUNT(*)', 'DESC')
+        .limit(5)
+        .getRawMany();
+
+    const topProviders: TopProviderDto[] = topProvidersRaw.map((row) => ({
+      providerId: row.providerId,
+      recordCount: parseInt(row.recordCount, 10),
+    }));
+
+    // Records by type breakdown
+    const byTypeRaw: { recordType: string; count: string }[] =
+      await this.medicalRecordRepository
+        .createQueryBuilder('r')
+        .select('r.recordType', 'recordType')
+        .addSelect('COUNT(*)', 'count')
+        .groupBy('r.recordType')
+        .orderBy('COUNT(*)', 'DESC')
+        .getRawMany();
+
+    const recordsByType: RecordsByTypeDto[] = byTypeRaw.map((row) => ({
+      recordType: row.recordType,
+      count: parseInt(row.count, 10),
+    }));
+
+    const result: AdminStatsResponseDto = {
+      totalPatients,
+      totalProviders,
+      totalRecords,
+      recordsLast7Days,
+      recordsLast30Days,
+      topProviders,
+      recordsByType,
+      activeAccessGrants,
+      cachedAt: now.toISOString(),
+    };
+
+    await this.cacheManager.set(CACHE_KEY, result, TTL_SECONDS);
     return result;
   }
 

@@ -13,7 +13,7 @@ import { CreateAccessGrantDto } from '../dto/create-access-grant.dto';
 import { CreateEmergencyAccessDto } from '../dto/create-emergency-access.dto';
 import { NotificationsService } from '../../notifications/services/notifications.service';
 import { SorobanQueueService } from './soroban-queue.service';
-import { User } from '../../auth/entities/user.entity';
+import { User, UserRole } from '../../auth/entities/user.entity';
 import { AuditLogService } from '../../common/services/audit-log.service';
 
 @Injectable()
@@ -73,6 +73,16 @@ export class AccessControlService {
 
     this.logger.log(`Access granted: ${updated.id} for patient ${patientId}`);
 
+    // Tamper-evident audit log
+    this.auditLogService.log({
+      actorAddress: patientId,
+      action: 'GRANT_CHANGE',
+      targetAddress: dto.granteeId,
+      resourceType: 'AccessGrant',
+      resourceId: updated.id,
+      metadata: { recordIds: updated.recordIds, accessLevel: updated.accessLevel },
+    }).catch(() => {});
+
     return updated;
   }
 
@@ -106,6 +116,16 @@ export class AccessControlService {
     });
 
     this.logger.log(`Access revoked: ${grantId} by patient ${patientId}`);
+
+    // Tamper-evident audit log
+    this.auditLogService.log({
+      actorAddress: patientId,
+      action: 'GRANT_REVOKE',
+      targetAddress: finalGrant.granteeId,
+      resourceType: 'AccessGrant',
+      resourceId: finalGrant.id,
+      metadata: { reason: finalGrant.revocationReason },
+    }).catch(() => {});
 
     return finalGrant;
   }
@@ -262,23 +282,31 @@ export class AccessControlService {
     return grant;
   }
 
-  async expireEmergencyGrants(): Promise<number> {
-    const result = await this.grantRepository.update(
-      {
+  async expireEmergencyGrants(): Promise<AccessGrant[]> {
+    const grants = await this.grantRepository.find({
+      where: {
         isEmergency: true,
         status: GrantStatus.ACTIVE,
         expiresAt: LessThanOrEqual(new Date()),
       },
-      {
-        status: GrantStatus.EXPIRED,
-      },
+    });
+
+    if (grants.length === 0) return [];
+
+    await this.grantRepository.update(
+      grants.map((g) => g.id),
+      { status: GrantStatus.EXPIRING },
     );
 
-    const expired = result.affected || 0;
-    if (expired > 0) {
-      this.logger.log(`Expired ${expired} emergency access grants`);
-    }
-    return expired;
+    this.logger.log(`Marked ${grants.length} emergency grants as EXPIRING`);
+    return grants.map((g) => ({ ...g, status: GrantStatus.EXPIRING }));
+  }
+
+  async finalizeExpiredGrant(grantId: string, sorobanTxHash: string): Promise<void> {
+    await this.grantRepository.update(grantId, {
+      status: GrantStatus.EXPIRED,
+      sorobanTxHash,
+    });
   }
 
   async getPatientGrants(patientId: string): Promise<AccessGrant[]> {
@@ -317,6 +345,39 @@ export class AccessControlService {
     return activeGrants;
   }
 
+  async canAccessRecord(
+    patientId: string,
+    requesterId: string,
+    requesterRole: UserRole,
+    recordId: string,
+  ): Promise<boolean> {
+    if (patientId === requesterId) {
+      return true;
+    }
+
+    if (requesterRole === UserRole.PATIENT) {
+      return false;
+    }
+
+    const grants = await this.findRelevantActiveGrants(patientId, requesterId);
+    const now = new Date();
+
+    for (const grant of grants) {
+      if (grant.expiresAt && grant.expiresAt <= now) {
+        if (grant.status !== GrantStatus.EXPIRED) {
+          await this.grantRepository.update(grant.id, { status: GrantStatus.EXPIRED });
+        }
+        continue;
+      }
+
+      if (grant.recordIds.includes('*') || grant.recordIds.includes(recordId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   private async findRelevantActiveGrants(
     patientId: string,
     granteeId: string,
@@ -331,23 +392,23 @@ export class AccessControlService {
     });
   }
 
-    async verifyAccess(requesterId: string, recordId: string): Promise<boolean> {
-      this.logger.log(`Verifying access for requester ${requesterId} on record ${recordId}`);
+  async verifyAccess(requesterId: string, recordId: string): Promise<boolean> {
+    this.logger.log(`Verifying access for requester ${requesterId} on record ${recordId}`);
 
-      const grants = await this.grantRepository.find({
-        where: {
-          granteeId: requesterId,
-          status: GrantStatus.ACTIVE,
-        },
-      });
+    const grants = await this.grantRepository.find({
+      where: {
+        granteeId: requesterId,
+        status: GrantStatus.ACTIVE,
+      },
+    });
 
-      const now = new Date();
-      const validGrant = grants.find((grant) => {
-        const hasRecord = grant.recordIds.includes(recordId);
-        const notExpired = !grant.expiresAt || grant.expiresAt > now;
-        return hasRecord && notExpired;
-      });
+    const now = new Date();
+    const validGrant = grants.find((grant) => {
+      const hasRecord = grant.recordIds.includes(recordId);
+      const notExpired = !grant.expiresAt || grant.expiresAt > now;
+      return hasRecord && notExpired;
+    });
 
-      return !!validGrant;
-    }
+    return !!validGrant;
+  }
 }
