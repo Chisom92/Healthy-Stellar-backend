@@ -62,6 +62,7 @@ import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
 import { EventStoreModule } from './event-store/event-store.module';
 import { BullBoardAuthMiddleware } from './queues/middleware/bull-board-auth.middleware';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { MedicalCacheModule } from './performance/medical-cache/medical-cache.module';
 
 @Module({
   imports: [
@@ -131,6 +132,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     CqrsModule,
     ProviderPatientModule,
     WebhooksModule,
+    MedicalCacheModule,
   ],
   controllers: [AppController],
   providers: [
