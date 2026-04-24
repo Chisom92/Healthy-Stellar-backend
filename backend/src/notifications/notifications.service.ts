@@ -7,7 +7,7 @@ import { NotificationType } from './entities/notification.entity';
 
 export interface SubscriptionLifecycleNotificationRequest {
   dedupeKey: string;
-  event: 'renewed' | 'cancelled';
+  event: 'renewed' | 'cancelled' | 'renewal_failed';
   recipientUserId: string;
   creatorUserId: string;
   creatorDisplayName?: string;
@@ -125,6 +125,24 @@ export class NotificationsService {
       };
     }
 
+    if (request.event === 'renewal_failed') {
+      const title =
+        digestCount > 1
+          ? `${digestCount} subscription renewals failed`
+          : 'Subscription renewal failed';
+      const body =
+        digestCount > 1
+          ? `${digestCount} subscription renewals to ${creatorName} could not be processed.`
+          : `Your subscription renewal to ${creatorName} could not be processed. Please update your payment details.`;
+      return {
+        inApp: { title, body },
+        email: {
+          subject: `Action required: ${creatorName} subscription renewal failed`,
+          body: `Your subscription renewal for ${creatorName} failed on ${occurredAt}. Please update your payment details to keep your subscription active.`,
+        },
+      };
+    }
+
     const title =
       digestCount > 1
         ? `${digestCount} subscriptions cancelled`
@@ -170,6 +188,82 @@ export class NotificationsService {
       if (job.status === 'pending') {
         await this.processQueueJob(dedupeKey);
       }
+    }
+  }
+
+  /**
+   * Durable delivery path called by {@link NotificationOutboxService}.
+   *
+   * Performs the actual in-app notification write (with digest folding) and
+   * records the email side-effect. Unlike the in-memory queue path this method
+   * throws on failure so the outbox processor can apply exponential back-off
+   * and retry.
+   */
+  async deliverNotification(
+    request: SubscriptionLifecycleNotificationRequest,
+  ): Promise<Notification> {
+    const type = this.notificationTypeFor(request.event);
+    const eventTime = (request.occurredAt ?? new Date()).toISOString();
+
+    // Try to fold into an open digest window first.
+    const folded = await this.foldIntoDigest(
+      request.recipientUserId,
+      type,
+      request.creatorUserId,
+      eventTime,
+    );
+
+    if (folded) {
+      return folded;
+    }
+
+    const template = this.buildSubscriptionLifecycleTemplate(request, 1);
+    const notification = await this.create({
+      user_id: request.recipientUserId,
+      type,
+      title: template.inApp.title,
+      body: template.inApp.body,
+      metadata: {
+        creatorUserId: request.creatorUserId,
+        subscriptionId: request.subscriptionId,
+        planId: request.planId,
+        lifecycleEvent: request.event,
+        dedupeKey: request.dedupeKey,
+      },
+      digest_count: 1,
+      digest_event_times: [eventTime],
+    });
+
+    this.openDigestWindow(
+      request.recipientUserId,
+      type,
+      request.creatorUserId,
+      notification.id,
+      eventTime,
+    );
+
+    if (request.emailEnabled !== false) {
+      this.sentEmails.push({
+        dedupeKey: request.dedupeKey,
+        toUserId: request.recipientUserId,
+        subject: template.email.subject,
+        body: template.email.body,
+      });
+    }
+
+    return notification;
+  }
+
+  /** Map a lifecycle event string to the corresponding {@link NotificationType}. */
+  notificationTypeFor(event: SubscriptionLifecycleNotificationRequest['event']): NotificationType {
+    switch (event) {
+      case 'renewed':
+        return NotificationType.SUBSCRIPTION_RENEWED;
+      case 'renewal_failed':
+        return NotificationType.SUBSCRIPTION_RENEWAL_FAILED;
+      case 'cancelled':
+      default:
+        return NotificationType.SUBSCRIPTION_CANCELLED;
     }
   }
 
@@ -293,10 +387,7 @@ export class NotificationsService {
       return existing;
     }
 
-    const type =
-      job.payload.event === 'renewed'
-        ? NotificationType.SUBSCRIPTION_RENEWED
-        : NotificationType.SUBSCRIPTION_CANCELLED;
+    const type = this.notificationTypeFor(job.payload.event);
 
     const eventTime = (job.payload.occurredAt ?? new Date()).toISOString();
 

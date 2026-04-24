@@ -9,6 +9,8 @@ import { CreateIdempotencyKeys1711554835000 } from './idempotency/1711554835000-
 import { AddQueuedAtToModerationFlags1745000000000 } from './moderation/1745000000000-AddQueuedAtToModerationFlags';
 import { CreateReferralTables1745000000000 } from './referral/1745000000000-CreateReferralTables';
 import { AddDigestColumnsToNotifications1745100000000 } from './notifications/1745100000000-AddDigestColumnsToNotifications';
+import { CreateNotificationOutbox1745200000000 } from './notifications/1745200000000-CreateNotificationOutbox';
+import { AddRenewalFailedNotificationType1745200000001 } from './notifications/1745200000001-AddRenewalFailedNotificationType';
 
 export const migrationDataSource = new DataSource({
   type: 'postgres',
@@ -27,5 +29,7 @@ export const migrationDataSource = new DataSource({
     AddQueuedAtToModerationFlags1745000000000,
     CreateReferralTables1745000000000,
     AddDigestColumnsToNotifications1745100000000,
+    CreateNotificationOutbox1745200000000,
+    AddRenewalFailedNotificationType1745200000001,
   ],
 });

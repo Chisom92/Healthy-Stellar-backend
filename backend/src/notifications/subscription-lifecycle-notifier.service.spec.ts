@@ -1,34 +1,36 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventBus } from '../events/event-bus';
 import { InProcessEventBus } from '../events/in-process-event-bus';
-import { SubscriptionCancelledEvent, SubscriptionRenewedEvent } from '../events/domain-events';
-import { NotificationsService } from './notifications.service';
+import {
+  SubscriptionCancelledEvent,
+  SubscriptionRenewedEvent,
+  SubscriptionRenewalFailedEvent,
+} from '../events/domain-events';
+import { NotificationOutboxService } from './notification-outbox.service';
 import { SubscriptionLifecycleNotifierService } from './subscription-lifecycle-notifier.service';
 
 describe('SubscriptionLifecycleNotifierService', () => {
   let eventBus: InProcessEventBus;
-  let notificationsService: {
-    enqueueSubscriptionLifecycleNotification: jest.Mock;
-  };
+  let outboxService: { enqueue: jest.Mock };
 
   beforeEach(async () => {
     eventBus = new InProcessEventBus();
-    notificationsService = {
-      enqueueSubscriptionLifecycleNotification: jest.fn().mockResolvedValue(null),
+    outboxService = {
+      enqueue: jest.fn().mockResolvedValue({}),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SubscriptionLifecycleNotifierService,
         { provide: EventBus, useValue: eventBus },
-        { provide: NotificationsService, useValue: notificationsService },
+        { provide: NotificationOutboxService, useValue: outboxService },
       ],
     }).compile();
 
     module.get(SubscriptionLifecycleNotifierService).onModuleInit();
   });
 
-  it('forwards renewed events to the notifications queue with a stable dedupe key', async () => {
+  it('enqueues renewed events to the outbox with a stable dedupe key', async () => {
     const event = new SubscriptionRenewedEvent(
       'sub-1',
       'fan-1',
@@ -41,18 +43,20 @@ describe('SubscriptionLifecycleNotifierService', () => {
     eventBus.publish(event);
     await Promise.resolve();
 
-    expect(
-      notificationsService.enqueueSubscriptionLifecycleNotification,
-    ).toHaveBeenCalledWith(
+    expect(outboxService.enqueue).toHaveBeenCalledWith(
+      'subscription.renewed:sub-1:123456',
       expect.objectContaining({
         dedupeKey: 'subscription.renewed:sub-1:123456',
         event: 'renewed',
         recipientUserId: 'fan-1',
+        creatorUserId: 'creator-1',
+        subscriptionId: 'sub-1',
+        planId: 1,
       }),
     );
   });
 
-  it('forwards cancelled events to the notifications queue with a stable dedupe key', async () => {
+  it('enqueues cancelled events to the outbox with a stable dedupe key', async () => {
     const event = new SubscriptionCancelledEvent(
       'sub-2',
       'fan-2',
@@ -65,13 +69,37 @@ describe('SubscriptionLifecycleNotifierService', () => {
     eventBus.publish(event);
     await Promise.resolve();
 
-    expect(
-      notificationsService.enqueueSubscriptionLifecycleNotification,
-    ).toHaveBeenCalledWith(
+    expect(outboxService.enqueue).toHaveBeenCalledWith(
+      'subscription.cancelled:sub-2:654321',
       expect.objectContaining({
         dedupeKey: 'subscription.cancelled:sub-2:654321',
         event: 'cancelled',
         recipientUserId: 'fan-2',
+        creatorUserId: 'creator-2',
+      }),
+    );
+  });
+
+  it('enqueues renewal_failed events to the outbox with a stable dedupe key', async () => {
+    const event = new SubscriptionRenewalFailedEvent(
+      'sub-3',
+      'fan-3',
+      'creator-3',
+      2,
+      'insufficient funds',
+      999999,
+    );
+
+    eventBus.publish(event);
+    await Promise.resolve();
+
+    expect(outboxService.enqueue).toHaveBeenCalledWith(
+      'subscription.renewal_failed:sub-3:999999',
+      expect.objectContaining({
+        dedupeKey: 'subscription.renewal_failed:sub-3:999999',
+        event: 'renewal_failed',
+        recipientUserId: 'fan-3',
+        creatorUserId: 'creator-3',
       }),
     );
   });
