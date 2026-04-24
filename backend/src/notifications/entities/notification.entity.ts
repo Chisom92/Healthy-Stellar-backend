@@ -13,6 +13,7 @@ export enum NotificationType {
   NEW_SUBSCRIBER = 'new_subscriber',
   SUBSCRIPTION_RENEWED = 'subscription_renewed',
   SUBSCRIPTION_CANCELLED = 'subscription_cancelled',
+  SUBSCRIPTION_RENEWAL_FAILED = 'subscription_renewal_failed',
   NEW_COMMENT = 'new_comment',
   NEW_LIKE = 'new_like',
   NEW_MESSAGE = 'new_message',
