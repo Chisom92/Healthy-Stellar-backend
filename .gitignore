@@ -57,6 +57,9 @@ Thumbs.db
 *.db
 *.db-journal
 
+# Prevent accidental OS-level copy directories (macOS creates "name copy")
+migrations copy/
+
 # Secrets and Keys
 secrets/
 *.pem
