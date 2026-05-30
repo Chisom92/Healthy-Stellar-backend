@@ -10,15 +10,18 @@ import { AdminController } from './controllers/admin.controller';
 import { AdminPatientsController } from './controllers/admin-patients.controller';
 import { PatientModule } from '../patients/patients.module';
 import { IpAllowlistGuard } from '../common/guards/ip-allowlist.guard';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { ApiKeyExpiryTask } from '../auth/tasks/api-key-expiry.task';
 
 @Module({
   imports: [
     ConfigModule,
     TypeOrmModule.forFeature([ApiKey, User, AuditLogEntity]),
     PatientModule,
+    NotificationsModule,
   ],
   controllers: [AdminController, AdminPatientsController],
-  providers: [ApiKeyService, AuditService, IpAllowlistGuard],
+  providers: [ApiKeyService, AuditService, IpAllowlistGuard, ApiKeyExpiryTask],
   exports: [ApiKeyService],
 })
 export class AdminModule {}

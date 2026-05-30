@@ -3,6 +3,7 @@ import {
   Post,
   Delete,
   Get,
+  Query,
   Body,
   Param,
   UseGuards,
@@ -18,6 +19,7 @@ import {
   CreateApiKeyDto,
   CreateApiKeyResponse,
   ApiKeyResponse,
+  ExpiringSoonApiKeyResponse,
 } from '../../auth/services/api-key.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PolicyGuard } from '../../rbac/guards/policy.guard';
@@ -63,6 +65,16 @@ export class AdminController {
   })
   async listApiKeys(): Promise<ApiKeyResponse[]> {
     return this.apiKeyService.listApiKeys();
+  }
+
+  @Get('expiring-soon')
+  @ApiOperation({ summary: 'List API keys expiring within the next N days (default 30)' })
+  @ApiResponse({ status: 200, description: 'List of expiring API keys' })
+  async getExpiringSoon(
+    @Query('days') days = '30',
+  ): Promise<ExpiringSoonApiKeyResponse[]> {
+    const withinDays = Math.min(Math.max(parseInt(days, 10) || 30, 1), 365);
+    return this.apiKeyService.getExpiringSoon(withinDays);
   }
 
   @Delete(':id')

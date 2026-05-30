@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
+import * as argon2 from 'argon2';
 import { MfaEntity } from '../entities/mfa.entity';
 import { User } from '../entities/user.entity';
 
@@ -46,13 +47,13 @@ export class MfaService {
     // Generate QR code
     const qrCode = await QRCode.toDataURL(secret.otpauth_url);
 
-    // Generate backup codes (8 codes, 8 characters each)
-    const backupCodes = this.generateBackupCodes(8);
+    // Generate plaintext preview codes shown once during setup; actual hashed codes stored on verify
+    const { plain } = await this.generateBackupCodes(8);
 
     return {
       secret: secret.base32,
       qrCode,
-      backupCodes,
+      backupCodes: plain,
     };
   }
 
@@ -89,14 +90,14 @@ export class MfaService {
       throw new BadRequestException('Invalid verification code');
     }
 
-    // Generate backup codes
-    const backupCodes = this.generateBackupCodes(8);
+    // Generate backup codes — store only hashes, return plaintext once
+    const { plain: backupCodes, hashed: hashedBackupCodes } = await this.generateBackupCodes(8);
 
     // Create and save MFA device
     const mfaDevice = this.mfaRepository.create({
       userId,
       secret: secret.base32,
-      backupCodes,
+      backupCodes: hashedBackupCodes,
       isVerified: true,
       verifiedAt: new Date(),
       deviceName: deviceName || 'Primary Device',
@@ -153,15 +154,27 @@ export class MfaService {
   }
 
   /**
-   * Verify backup code
+   * Verify backup code — compare against stored hashes, enforce single-use
    */
   private async verifyBackupCode(mfaDevice: MfaEntity, code: string): Promise<boolean> {
-    if (!mfaDevice.backupCodes || !mfaDevice.backupCodes.includes(code)) {
+    if (!mfaDevice.backupCodes || mfaDevice.backupCodes.length === 0) {
       return false;
     }
 
-    // Remove used backup code
-    mfaDevice.backupCodes = mfaDevice.backupCodes.filter((c) => c !== code);
+    let matchedIndex = -1;
+    for (let i = 0; i < mfaDevice.backupCodes.length; i++) {
+      if (await argon2.verify(mfaDevice.backupCodes[i], code)) {
+        matchedIndex = i;
+        break;
+      }
+    }
+
+    if (matchedIndex === -1) {
+      return false;
+    }
+
+    // Single-use: remove the consumed code immediately
+    mfaDevice.backupCodes = mfaDevice.backupCodes.filter((_, i) => i !== matchedIndex);
     mfaDevice.lastUsedAt = new Date();
     await this.mfaRepository.save(mfaDevice);
 
@@ -183,8 +196,8 @@ export class MfaService {
       throw new NotFoundException('MFA device not found');
     }
 
-    const newBackupCodes = this.generateBackupCodes(8);
-    mfaDevice.backupCodes = newBackupCodes;
+    const { plain: newBackupCodes, hashed: hashedNewCodes } = await this.generateBackupCodes(8);
+    mfaDevice.backupCodes = hashedNewCodes;
     await this.mfaRepository.save(mfaDevice);
 
     return newBackupCodes;
@@ -218,21 +231,22 @@ export class MfaService {
   }
 
   /**
-   * Generate backup codes (8 characters, alphanumeric)
+   * Generate backup codes — returns plaintext (shown once to user) and argon2 hashes (stored in DB)
    */
-  private generateBackupCodes(count: number): string[] {
-    const codes: string[] = [];
+  private async generateBackupCodes(count: number): Promise<{ plain: string[]; hashed: string[] }> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const plain: string[] = [];
 
     for (let i = 0; i < count; i++) {
       let code = '';
       for (let j = 0; j < 8; j++) {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
       }
-      codes.push(code);
+      plain.push(code);
     }
 
-    return codes;
+    const hashed = await Promise.all(plain.map((c) => argon2.hash(c)));
+    return { plain, hashed };
   }
 
   /**

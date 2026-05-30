@@ -66,7 +66,8 @@
     "export:schema": "ts-node -r tsconfig-paths/register scripts/export-schema.ts",
     "version:sdk": "node scripts/version-sdk.js",
     "publish:sdk": "npm publish packages/sdk --access public",
-    "docs:generate": "ts-node -r tsconfig-paths/register 'src/SwaggerOpenAPI Documentation with Full Schema Coverage/export-openapi.ts'"
+    "docs:generate": "ts-node -r tsconfig-paths/register 'src/SwaggerOpenAPI Documentation with Full Schema Coverage/export-openapi.ts'",
+    "generate:graphql-types": "graphql-codegen --config codegen.yml"
   },
   "repository": {
     "type": "git",
@@ -169,6 +170,10 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^5.0.0",
+    "@graphql-codegen/schema-ast": "^4.1.0",
+    "@graphql-codegen/typescript": "^4.1.0",
+    "@graphql-codegen/typescript-operations": "^4.3.0",
     "@faker-js/faker": "^9.3.0",
     "@nestjs/cli": "^11.0.16",
     "@nestjs/schedule": "^6.1.1",

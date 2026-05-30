@@ -1,5 +1,5 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleInit } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,12 +12,13 @@ import { AccessGrant, GrantStatus } from '../../access-control/entities/access-g
 import { AuditLogEntity } from '../../common/audit/audit-log.entity';
 import { IpfsService } from '../../records/services/ipfs.service';
 import { NotificationsService } from '../../notifications/services/notifications.service';
+import { DeletionRegistryService } from '../services/deletion-registry.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 
 @Processor('gdpr')
-export class GdprProcessor extends WorkerHost {
+export class GdprProcessor extends WorkerHost implements OnModuleInit {
   private readonly logger = new Logger(GdprProcessor.name);
 
   constructor(
@@ -32,8 +33,78 @@ export class GdprProcessor extends WorkerHost {
     private readonly auditLogRepository: Repository<AuditLogEntity>,
     private readonly ipfsService: IpfsService,
     private readonly notificationsService: NotificationsService,
+    private readonly deletionRegistry: DeletionRegistryService,
   ) {
     super();
+  }
+
+  onModuleInit(): void {
+    this.deletionRegistry.register({
+      moduleName: 'users',
+      deleteForUser: async (userId, manager) => {
+        const user = await manager.findOne(User, { where: { id: userId } });
+        if (user) {
+          user.firstName = '[DELETED]';
+          user.lastName = '[DELETED]';
+          user.displayName = '[DELETED]';
+          user.email = `deleted-${userId}@anonymized.local`;
+          user.phone = '[DELETED]';
+          user.npi = '[DELETED]';
+          user.licenseNumber = '[DELETED]';
+          await manager.save(User, user);
+        }
+      },
+    });
+
+    this.deletionRegistry.register({
+      moduleName: 'patients',
+      deleteForUser: async (userId, manager) => {
+        const patient = await manager.findOne(Patient, { where: { id: userId } });
+        if (patient) {
+          patient.firstName = '[DELETED]';
+          patient.lastName = '[DELETED]';
+          patient.middleName = '[DELETED]';
+          patient.email = '[DELETED]';
+          patient.phone = '[DELETED]';
+          patient.address = '[DELETED]';
+          patient.dateOfBirth = '1900-01-01';
+          patient.nationalId = null;
+          await manager.save(Patient, patient);
+        }
+      },
+    });
+
+    this.deletionRegistry.register({
+      moduleName: 'records',
+      deleteForUser: async (userId, manager) => {
+        await manager.delete(Record, { patientId: userId });
+      },
+    });
+
+    this.deletionRegistry.register({
+      moduleName: 'medical-records',
+      deleteForUser: async (userId, manager) => {
+        await manager.delete(MedicalRecord, { patientId: userId });
+      },
+    });
+
+    this.deletionRegistry.register({
+      moduleName: 'access-grants',
+      deleteForUser: async (userId, manager) => {
+        await manager.update(
+          AccessGrant,
+          { patientId: userId, status: GrantStatus.ACTIVE },
+          { status: GrantStatus.REVOKED, revokedAt: new Date(), revocationReason: 'GDPR Right to Erasure' },
+        );
+      },
+    });
+
+    this.deletionRegistry.register({
+      moduleName: 'audit-logs',
+      deleteForUser: async (userId, manager) => {
+        await manager.delete(AuditLogEntity, { userId });
+      },
+    });
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
@@ -123,34 +194,7 @@ export class GdprProcessor extends WorkerHost {
     });
 
     try {
-      // 1. Anonymize user data
-      const user = await this.userRepository.findOne({ where: { id: data.userId } });
-      const dataSubjectEmail = user?.email; // capture before anonymization
-      if (user) {
-        user.firstName = '[DELETED]';
-        user.lastName = '[DELETED]';
-        user.displayName = '[DELETED]';
-        user.email = `deleted-${data.userId}@anonymized.local`;
-        user.phone = '[DELETED]';
-        user.npi = '[DELETED]';
-        user.licenseNumber = '[DELETED]';
-        await this.userRepository.save(user);
-      }
-
-      const patient = await this.patientRepository.findOne({ where: { id: data.userId } });
-      if (patient) {
-        patient.firstName = '[DELETED]';
-        patient.lastName = '[DELETED]';
-        patient.middleName = '[DELETED]';
-        patient.email = '[DELETED]';
-        patient.phone = '[DELETED]';
-        patient.address = '[DELETED]';
-        patient.dateOfBirth = '1900-01-01';
-        patient.nationalId = null;
-        await this.patientRepository.save(patient);
-      }
-
-      // 2. Unpin IPFS records (best effort)
+      // 1. Unpin IPFS records (best effort, before deletion)
       const records = await this.recordRepository.find({ where: { patientId: data.userId } });
       for (const rec of records) {
         try {
@@ -162,17 +206,11 @@ export class GdprProcessor extends WorkerHost {
         }
       }
 
-      // 3. Notify all active grantees that access has been revoked
+      // 2. Notify active grantees before data is wiped
       const activeGrants = await this.accessGrantRepository.find({
         where: { patientId: data.userId, status: GrantStatus.ACTIVE },
       });
       for (const grant of activeGrants) {
-        grant.status = GrantStatus.REVOKED;
-        grant.revokedAt = new Date();
-        grant.revocationReason = 'GDPR Right to Erasure';
-        await this.accessGrantRepository.save(grant);
-
-        // Try notifying grantee
         try {
           const grantee = await this.userRepository.findOne({ where: { id: grant.granteeId } });
           if (grantee?.email && (this.notificationsService as any).sendEmail) {
@@ -187,6 +225,9 @@ export class GdprProcessor extends WorkerHost {
           // ignore notification errors
         }
       }
+
+      // 3. Run all registered deletion handlers in a single transaction
+      await this.deletionRegistry.deleteAllForUser(data.userId);
 
       // 4. Notify Data Protection Officer
       try {

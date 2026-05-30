@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bull';
 import { GdprController } from './controllers/gdpr.controller';
 import { GdprService } from './services/gdpr.service';
+import { DeletionRegistryService } from './services/deletion-registry.service';
 import { GdprRequest } from './entities/gdpr-request.entity';
 import { GdprProcessor } from './processors/gdpr.processor';
 import { AuthModule } from '../auth/auth.module';
@@ -42,7 +43,7 @@ import { AuditLogEntity } from '../common/audit/audit-log.entity';
     StellarModule,
   ],
   controllers: [GdprController],
-  providers: [GdprService, GdprProcessor],
-  exports: [GdprService],
+  providers: [GdprService, GdprProcessor, DeletionRegistryService],
+  exports: [GdprService, DeletionRegistryService],
 })
 export class GdprModule {}
